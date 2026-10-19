@@ -1,0 +1,106 @@
+/*
+ * Global tokens, reset, and base typography for the workspace.
+ * Layout and component styles live in src/app/workspace.css.
+ */
+
+:root {
+  --bg: #070c14;
+  --bg-panel: #0d1626;
+  --bg-panel-alt: #101c2e;
+  --bg-input: #0a1322;
+  --border: #1b2c45;
+  --border-strong: #2a4463;
+  --text: #dce8f5;
+  --text-muted: #90a8c2;
+  --text-dim: #667f9c;
+  --accent: #5ad1e6;
+  --accent-soft: #7ef0ff;
+  --accent-2: #7aa2f7;
+  --ok: #4cc38a;
+  --warn: #f0b429;
+  --danger: #f2686b;
+  --radius: 10px;
+  --radius-sm: 6px;
+  --gap: 10px;
+  --mono: ui-monospace, 'Cascadia Code', Consolas, 'Courier New', monospace;
+
+  color-scheme: dark;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3 {
+  margin: 0;
+  font-weight: 600;
+}
+
+p {
+  margin: 0;
+}
+
+ul,
+ol,
+dl,
+dd {
+  margin: 0;
+  padding: 0;
+}
+
+li {
+  list-style: none;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}
+
+code,
+.mono {
+  font-family: var(--mono);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* Scrollbars: subtle, so side panels do not dominate the dark theme. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 4px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
