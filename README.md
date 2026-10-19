@@ -95,8 +95,7 @@ docs/           # Technical documentation (see below)
   numerical evidence, and the claims this project must not make.
 
 Additional internal planning notes (decision log, roadmap and acceptance criteria, product brief, data and
-asset planning) are intentionally not part of this publication. Cross-references to them inside the two
-documents above point to files that only exist in the private working copy.
+asset planning) are intentionally not part of this publication.
 
 ## Not implemented yet
 

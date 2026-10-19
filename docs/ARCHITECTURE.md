@@ -40,7 +40,7 @@ Simulation Results & Mission Evaluator
 
 ### UI and scene renderer
 
-The rendering layer may load curated third-party meshes and textures. Follow `docs/ASSET_PIPELINE.md`, register every asset actually shipped in `docs/ASSET_ATTRIBUTION.md`, and keep physical properties/scenario state independent from render geometry and display scale. Asset-load failures must degrade to a placeholder rather than alter or block the simulation state.
+The rendering layer may load curated third-party meshes and textures. Before any such asset is shipped, review its license and usage terms, record the attribution that license requires, and keep physical properties and scenario state independent from render geometry and display scale. Asset-load failures must degrade to a placeholder rather than alter or block the simulation state.
 
 
 Render scenario state, labels, object selection, trajectories, vector overlays, and controls. It must not independently calculate authoritative physics. Visual scaling must not mutate physical values.
@@ -227,4 +227,4 @@ geometry only (sphere, lines, axes gizmo) and loads no models or textures.
 ### Not yet decided in code
 
 Whether the scenario manager owns mission templates and how runs are persisted across sessions are still open;
-comparison records currently live in memory for the session only. See `docs/DECISIONS.md`.
+comparison records currently live in memory for the session only.
