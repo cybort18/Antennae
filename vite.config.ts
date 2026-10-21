@@ -11,5 +11,13 @@ export default defineConfig({
     environment: 'node',
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
     setupFiles: ['./src/test/setup.ts'],
+    // DOM flows that run a geostationary candidate integrate several thousand
+    // steps; keep the default command stable on constrained/parallel machines
+    // without weakening any assertion.
+    testTimeout: 15000,
+    // This machine launches a fresh fork per test file. Unlimited parallelism
+    // has intermittently exceeded the worker-start timeout on Windows; four
+    // workers keeps the full suite reproducible without serializing it.
+    maxWorkers: 4,
   },
 })

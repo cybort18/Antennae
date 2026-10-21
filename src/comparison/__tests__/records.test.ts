@@ -9,18 +9,39 @@
 import { describe, expect, it } from 'vitest';
 
 import { EARTH_MEAN_RADIUS_KM, magnitude } from '../../simulation';
-import { DEFAULT_SCENARIO_INPUTS, buildScenarioConfig } from '../../scenarios/scenarioInputs';
+import { loadReferencePresets } from '../../data/referencePresets';
+import {
+  DEFAULT_SCENARIO_INPUTS,
+  buildScenarioConfig,
+  inputsFromReferencePreset,
+} from '../../scenarios/scenarioInputs';
 import {
   candidateRunState,
   editDraft,
   initialComparisonState,
   promoteCandidateToBaseline,
+  replaceDraft,
   restoreDraftFromBaseline,
   runCandidate,
   sameConfiguration,
   sameInputs,
   type ComparisonState,
 } from '../records';
+
+function referenceInputs() {
+  const loaded = loadReferencePresets();
+  if (loaded.error || !loaded.presets[0]) {
+    throw new Error(`Reference fixture must load: ${loaded.error ?? 'missing preset'}`);
+  }
+  const preset = loaded.presets[0];
+  return {
+    preset,
+    inputs: inputsFromReferencePreset(preset, {
+      orbitCount: 1,
+      timestepSeconds: 10,
+    }),
+  };
+}
 
 function initialState(): ComparisonState {
   const state = initialComparisonState();
@@ -203,6 +224,101 @@ describe('promoting the candidate to baseline', () => {
     expect(edited.draft.altitudeKm).toBe(300);
     // Restoring now returns to the promoted reference, not the original default.
     expect(restoreDraftFromBaseline(edited).draft.altitudeKm).toBe(900);
+  });
+});
+
+describe('cached reference states', () => {
+  it('loads the exact state into the draft without changing either record or running it', () => {
+    const state = initialState();
+    const { preset, inputs } = referenceInputs();
+    const loaded = replaceDraft(state, inputs);
+
+    expect(loaded.draft.reference?.id).toBe(preset.id);
+    expect(loaded.draft.reference?.state).toEqual(preset.state);
+    expect(loaded.draft.reference?.state.positionKm).not.toBe(preset.state.positionKm);
+    expect(loaded.baseline).toBe(state.baseline);
+    expect(loaded.candidate).toBeNull();
+    expect(candidateRunState(loaded)).toBe('unrun-changes');
+  });
+
+  it('runs the exact provider vector and binds the candidate record to its provenance', () => {
+    const state = initialState();
+    const { preset, inputs } = referenceInputs();
+    const ran = runCandidate(replaceDraft(state, inputs));
+
+    expect(ran.lastRunIssues).toEqual([]);
+    expect(ran.candidate?.inputs.reference?.id).toBe(preset.id);
+    expect(ran.candidate?.config.initialState).toEqual(preset.state);
+    expect(ran.candidate?.result.samples[0].state).toEqual(preset.state);
+    expect(ran.candidate?.result.label).toContain('hypothetical');
+    expect(ran.baseline).toBe(state.baseline);
+    expect(candidateRunState(ran)).toBe('in-sync');
+  });
+
+  it('treats a reference state and a circular state with the same numbers as different inputs', () => {
+    const state = initialState();
+    const { preset, inputs } = referenceInputs();
+    const loaded = replaceDraft(state, inputs);
+    const circular = editDraft(loaded, {
+      altitudeKm: loaded.draft.altitudeKm,
+      speedKmPerS: loaded.draft.speedKmPerS,
+    });
+
+    expect(circular.draft.reference).toBeUndefined();
+    expect(circular.draft.derivedFrom?.id).toBe(preset.id);
+    expect(circular.draft.derivedFrom?.state).toEqual(preset.state);
+    expect(circular.draft.derivedFrom?.state.positionKm).not.toBe(preset.state.positionKm);
+    expect(sameInputs(loaded.draft, circular.draft)).toBe(false);
+    expect(candidateRunState(circular)).toBe('unrun-changes');
+    expect(sameInputs(loaded.draft, replaceDraft(state, inputs).draft)).toBe(true);
+    expect(buildScenarioConfig(circular.draft).label).toContain('circular approximation');
+  });
+
+  it('keeps the reference-derived provenance when a converted candidate is run and promoted', () => {
+    const state = initialState();
+    const { preset, inputs } = referenceInputs();
+    const converted = editDraft(replaceDraft(state, inputs), {
+      altitudeKm: inputs.altitudeKm,
+      speedKmPerS: inputs.speedKmPerS,
+    });
+    const ran = runCandidate(converted);
+    const promoted = promoteCandidateToBaseline(ran);
+
+    expect(ran.candidate?.inputs.reference).toBeUndefined();
+    expect(ran.candidate?.inputs.derivedFrom?.id).toBe(preset.id);
+    expect(ran.candidate?.config.label).toContain('circular approximation');
+    expect(ran.candidate?.config.initialState.positionKm.x).toBeCloseTo(
+      EARTH_MEAN_RADIUS_KM + converted.draft.altitudeKm,
+      9,
+    );
+    expect(ran.candidate?.config.initialState.positionKm.y).toBe(0);
+    expect(ran.candidate?.config.initialState.positionKm.z).toBe(0);
+    expect(ran.candidate?.config.initialState.velocityKmPerS.x).toBe(0);
+    expect(ran.candidate?.config.initialState.velocityKmPerS.y).toBeCloseTo(
+      converted.draft.speedKmPerS,
+      12,
+    );
+    expect(ran.candidate?.result.samples[0].state).toEqual(
+      ran.candidate?.config.initialState,
+    );
+    expect(ran.candidate?.result.samples[0].state).not.toEqual(preset.state);
+    expect(promoted.baseline.inputs.derivedFrom?.id).toBe(preset.id);
+    expect(promoted.draft.derivedFrom?.id).toBe(preset.id);
+  });
+
+  it('preserves the reference through promotion and reproduces it when restoring', () => {
+    const state = initialState();
+    const { preset, inputs } = referenceInputs();
+    const ran = runCandidate(replaceDraft(state, inputs));
+    const promoted = promoteCandidateToBaseline(ran);
+
+    expect(promoted.baseline.inputs.reference?.id).toBe(preset.id);
+    expect(promoted.draft.reference?.id).toBe(preset.id);
+    expect(promoted.candidate).toBeNull();
+
+    const restored = restoreDraftFromBaseline(editDraft(promoted, { altitudeKm: 500 }));
+    expect(restored.candidate?.config.initialState).toEqual(preset.state);
+    expect(restored.candidate?.result.samples[0].state).toEqual(preset.state);
   });
 });
 

@@ -12,7 +12,7 @@
  * checked against the physical altitude difference.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, screen } from '@testing-library/react';
 import userEvent, { type UserEvent } from '@testing-library/user-event';
 
 vi.mock('../../scene/SimulationViewport', () => ({
@@ -31,7 +31,23 @@ vi.mock('../../scene/SimulationViewport', () => ({
   ),
 }));
 
-import App from '../../App';
+vi.mock('../../scene/SolarSystemViewport', () => ({
+  SolarSystemViewport: ({
+    selectedId,
+    focusMode,
+  }: {
+    selectedId: string;
+    focusMode: string;
+  }) => (
+    <div
+      data-testid="solar-system-viewport-stub"
+      data-selected-id={selectedId}
+      data-focus-mode={focusMode}
+    />
+  ),
+}));
+
+import { renderEarthLab } from './renderEarthLab';
 import { chartLayout } from '../altitudeChartMath';
 
 afterEach(cleanup);
@@ -118,7 +134,7 @@ async function setCircularCandidateAt(user: UserEvent, altitudeKm: string): Prom
 
 describe('initial comparison state', () => {
   it('opens with a completed baseline and no candidate series', () => {
-    render(<App />);
+    renderEarthLab();
 
     expect(screen.getByText('Locked comparison reference')).toBeTruthy();
     expect(screen.getAllByText(/No candidate run yet/).length).toBeGreaterThan(0);
@@ -140,18 +156,31 @@ describe('initial comparison state', () => {
   });
 
   it('labels both axes with explicit units', () => {
-    render(<App />);
+    renderEarthLab();
 
     const chart = document.querySelector('.chart');
     expect(chart?.textContent).toContain('simulated time (s)');
     expect(chart?.textContent).toContain('altitude above mean Earth radius (6371 km) — km');
+  });
+
+  it('renders distinct altitude tick labels for a nearly flat low orbit', () => {
+    renderEarthLab();
+
+    const labels = Array.from(document.querySelectorAll('.chart__tick'))
+      .filter((node) => Number(node.getAttribute('x')) < layout.plot.left)
+      .map((node) => node.textContent);
+
+    // The low-orbit altitude varies by a fraction of a kilometre. Formatting
+    // must follow the tick step instead of rounding every label to "400".
+    expect(labels.length).toBeGreaterThan(1);
+    expect(new Set(labels).size).toBe(labels.length);
   });
 });
 
 describe('candidate edits', () => {
   it('change neither the baseline record nor the chart', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderEarthLab();
 
     const baselineBefore = readSeries('baseline');
 
@@ -171,7 +200,7 @@ describe('candidate edits', () => {
 describe('running a candidate', () => {
   it('adds a second series, switches the viewport, and reports the difference', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderEarthLab();
 
     await setCircularCandidateAt(user, '900');
 
@@ -210,7 +239,7 @@ describe('running a candidate', () => {
 
   it('names each series with its own parameters and status', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderEarthLab();
 
     await setCircularCandidateAt(user, '900');
 
@@ -222,7 +251,7 @@ describe('running a candidate', () => {
 
   it('creates a second series from the candidate run only, never from the draft', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderEarthLab();
 
     await setCircularCandidateAt(user, '900');
     const afterRun = readSeries('candidate');
@@ -241,7 +270,7 @@ describe('running a candidate', () => {
 describe('restoring the baseline parameters', () => {
   it('reproduces the baseline run and leaves the reference intact', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderEarthLab();
 
     const baselineBefore = readSeries('baseline');
     await setAltitude(user, '900');
@@ -270,7 +299,7 @@ describe('restoring the baseline parameters', () => {
 
   it('returns to a promoted baseline, not to the original default', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderEarthLab();
 
     await setAltitude(user, '900');
     await runCandidate(user);
@@ -287,7 +316,7 @@ describe('restoring the baseline parameters', () => {
 describe('invalid candidate parameters', () => {
   it('never replace a valid run in the comparison', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderEarthLab();
 
     await setCircularCandidateAt(user, '900');
     const candidateBefore = readSeries('candidate');
@@ -311,7 +340,7 @@ describe('invalid candidate parameters', () => {
 describe('stopped candidate runs', () => {
   it('are drawn up to their last recorded sample and labelled as stopped', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderEarthLab();
 
     const baselineBefore = readSeries('baseline');
     await setSpeed(user, '5');
@@ -339,7 +368,7 @@ describe('stopped candidate runs', () => {
 describe('replacing the baseline', () => {
   it('requires an explicit confirmation and clears the candidate', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderEarthLab();
 
     await setAltitude(user, '900');
     await runCandidate(user);
@@ -362,7 +391,7 @@ describe('replacing the baseline', () => {
 
   it('can be cancelled without touching either record', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderEarthLab();
 
     await setAltitude(user, '900');
     await runCandidate(user);
@@ -381,7 +410,7 @@ describe('replacing the baseline', () => {
 describe('playback independence', () => {
   it('resetting or stepping playback never clears the comparison records', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderEarthLab();
 
     await setAltitude(user, '900');
     await runCandidate(user);
@@ -402,7 +431,7 @@ describe('playback independence', () => {
 
   it('switching the displayed trajectory does not change the compared runs', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderEarthLab();
 
     await setAltitude(user, '900');
     await runCandidate(user);

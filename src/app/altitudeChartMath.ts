@@ -134,10 +134,23 @@ export function niceTicks(domain: Domain, targetCount = 5): number[] {
   return ticks;
 }
 
-/** Axis label numbers: grouped thousands, no exponent notation. */
-export function formatTickValue(value: number): string {
-  const rounded = Math.abs(value) >= 100 ? Math.round(value) : Number(value.toFixed(2));
-  return rounded.toLocaleString('en-US', { maximumFractionDigits: 2 });
+/**
+ * Axis label numbers: grouped thousands, no exponent notation.
+ *
+ * When the tick step is supplied, precision follows the step rather than the
+ * magnitude of the value. This matters for a low-Earth-orbit chart whose
+ * altitude axis spans only a fraction of a kilometre: three values around
+ * 400 km must not all render as "400".
+ */
+export function formatTickValue(value: number, step?: number): string {
+  const decimals =
+    step === undefined
+      ? Math.abs(value) < 10
+        ? 2
+        : 0
+      : Math.min(6, Math.max(0, Math.ceil(-Math.log10(step) + 1e-9)));
+  const rounded = Number(value.toFixed(decimals));
+  return rounded.toLocaleString('en-US', { maximumFractionDigits: decimals });
 }
 
 /** Decimal places that keep sampled coordinates readable in DOM attributes. */

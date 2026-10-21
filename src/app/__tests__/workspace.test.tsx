@@ -11,7 +11,7 @@
  * connection between engine and UI fails these tests.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 vi.mock('../../scene/SimulationViewport', () => ({
@@ -30,7 +30,23 @@ vi.mock('../../scene/SimulationViewport', () => ({
   ),
 }));
 
-import App from '../../App';
+vi.mock('../../scene/SolarSystemViewport', () => ({
+  SolarSystemViewport: ({
+    selectedId,
+    focusMode,
+  }: {
+    selectedId: string;
+    focusMode: string;
+  }) => (
+    <div
+      data-testid="solar-system-viewport-stub"
+      data-selected-id={selectedId}
+      data-focus-mode={focusMode}
+    />
+  ),
+}));
+
+import { renderEarthLab } from './renderEarthLab';
 
 afterEach(cleanup);
 
@@ -44,7 +60,7 @@ function viewportStub(): HTMLElement {
 
 describe('workspace shell', () => {
   it('renders the app identity, model status, and both objects', () => {
-    render(<App />);
+    renderEarthLab();
 
     expect(screen.getByText('Antennae')).toBeTruthy();
     expect(screen.getByText('Space Sandbox')).toBeTruthy();
@@ -53,11 +69,11 @@ describe('workspace shell', () => {
     expect(screen.getAllByText('Completed').length).toBeGreaterThan(0);
 
     expect(screen.getByRole('button', { name: /Test particle/ })).toBeTruthy();
-    expect(screen.getByRole('button', { name: /Earth/ })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Earth.*central body/ })).toBeTruthy();
   });
 
   it('displays the model and scientific limitations disclosure', () => {
-    render(<App />);
+    renderEarthLab();
 
     expect(screen.getByText(/Simplified two-body point-mass gravity/)).toBeTruthy();
     expect(screen.getByText(/Earth-centered inertial axes/)).toBeTruthy();
@@ -66,7 +82,7 @@ describe('workspace shell', () => {
   });
 
   it('shows sample-derived metrics for the default scenario', () => {
-    render(<App />);
+    renderEarthLab();
 
     // 400 km altitude at 6771 km radius, rendered from the engine's first sample.
     // (The comparison summary reports the same value for baseline and candidate.)
@@ -78,21 +94,40 @@ describe('workspace shell', () => {
 
   it('switches the inspector when Earth is selected', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderEarthLab();
 
-    await user.click(screen.getByRole('button', { name: /Earth/ }));
+    await user.click(screen.getByRole('button', { name: /Earth.*central body/ }));
 
     expect(screen.getByText('Inspector — Earth')).toBeTruthy();
     expect(screen.getByText(/Fixed force centre at frame origin/)).toBeTruthy();
     // Reported twice: ephemeris state and rotation/oblateness are both absent.
     expect(screen.getAllByText('Not modelled').length).toBe(2);
   });
+
+  it('keeps the comparison chart available behind an explicit analysis toggle', async () => {
+    const user = userEvent.setup();
+    renderEarthLab();
+
+    const body = document.getElementById('comparison-chart-body');
+    const toggle = screen.getByRole('button', { name: 'Show chart' });
+
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    expect(body?.hasAttribute('hidden')).toBe(true);
+    // The chart is still rendered, just not taking space from the scene.
+    expect(screen.getByTestId('altitude-chart')).toBeTruthy();
+
+    await user.click(toggle);
+
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    expect(body?.hasAttribute('hidden')).toBe(false);
+    expect(screen.getByRole('button', { name: 'Hide chart' })).toBeTruthy();
+  });
 });
 
 describe('editing initial conditions', () => {
   it('keeps the running results untouched until the candidate is run', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderEarthLab();
 
     const sampleCountBefore = viewportStub().dataset.sampleCount;
     expect(screen.getAllByText('400.000 km').length).toBeGreaterThan(0);
@@ -121,7 +156,7 @@ describe('editing initial conditions', () => {
 
   it('can restore the circular speed for the current altitude', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderEarthLab();
 
     const altitude = screen.getByLabelText(/Initial altitude \(km\)/);
     await user.clear(altitude);
@@ -140,7 +175,7 @@ describe('editing initial conditions', () => {
 
   it('applies slider edits to the candidate parameters immediately', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderEarthLab();
 
     fireEvent.change(screen.getByLabelText(/Initial altitude slider/), {
       target: { value: '800' },
@@ -156,7 +191,7 @@ describe('editing initial conditions', () => {
 
   it('does not commit typed text until it is confirmed', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderEarthLab();
 
     const speed = screen.getByLabelText(/Initial tangential speed \(km\/s\)/);
     await user.clear(speed);
@@ -178,7 +213,7 @@ describe('editing initial conditions', () => {
 
   it('rejects out-of-range input without integrating anything', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderEarthLab();
 
     const altitude = screen.getByLabelText(/Initial altitude \(km\)/);
     await user.clear(altitude);
@@ -187,7 +222,7 @@ describe('editing initial conditions', () => {
 
     expect(screen.getByText(/Candidate parameters invalid — not integrated/)).toBeTruthy();
     expect(
-      screen.getAllByText(/Altitude must be between 200 and 20000 km/).length,
+      screen.getAllByText(/Altitude must be between 200 and 50000 km/).length,
     ).toBeGreaterThan(0);
 
     // Running it reports the rejection and still changes nothing.
@@ -201,7 +236,7 @@ describe('editing initial conditions', () => {
 describe('playback', () => {
   it('runs and pauses without changing simulation data', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderEarthLab();
 
     const sampleCount = viewportStub().dataset.sampleCount;
 
@@ -217,7 +252,7 @@ describe('playback', () => {
 
   it('steps sample-accurately and resets to the first sample', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderEarthLab();
 
     expect(readSampleCounter()).toContain('sample 1 /');
 
@@ -236,7 +271,7 @@ describe('playback', () => {
   it('advances playback while running and never past the recorded samples', () => {
     vi.useFakeTimers();
     try {
-      render(<App />);
+      renderEarthLab();
       const before = readSampleCounter();
 
       fireEvent.click(screen.getAllByRole('button', { name: /Run playback/ })[0]);
@@ -258,7 +293,7 @@ describe('playback', () => {
 
   it('changes the time scale without touching the physics', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderEarthLab();
 
     const sampleCount = viewportStub().dataset.sampleCount;
     await user.click(screen.getByRole('button', { name: '1000x' }));
@@ -273,7 +308,7 @@ describe('playback', () => {
 describe('stopped runs', () => {
   it('shows the engine warning instead of animating a successful completion', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderEarthLab();
 
     // A sub-circular speed drops the perigee below the stop radius.
     const speed = screen.getByLabelText(/Initial tangential speed \(km\/s\)/);

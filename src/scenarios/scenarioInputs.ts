@@ -10,11 +10,13 @@
  * src/simulation/units.ts) and scales that velocity magnitude to the requested
  * speed. No axis or frame logic is re-implemented here.
  *
- * Provenance: this is a synthetic educational idealization built from the
- * recorded Earth constants. It is NOT a NASA/JPL state vector and does not
- * represent a real spacecraft.
+ * Provenance: the default path is a synthetic educational idealization built
+ * from the recorded Earth constants. A caller may instead attach a validated
+ * cached reference preset; that path uses the provider state exactly and is
+ * labelled as a hypothetical propagation, not an ephemeris.
  */
 
+import type { ReferencePreset } from '../data/types';
 import {
   EARTH_CENTRAL_BODY,
   EARTH_MEAN_RADIUS_KM,
@@ -37,6 +39,20 @@ export type ScenarioInputs = {
   orbitCount: number;
   /** Integration timestep, seconds. Fixed for this milestone. */
   timestepSeconds: number;
+  /**
+   * When present, the engine receives this exact cached reference state rather
+   * than a circular state reconstructed from altitude/speed. The altitude and
+   * speed fields remain the derived display values used if the user converts
+   * the reference to a circular approximation.
+   */
+  reference?: ReferencePreset;
+  /**
+   * Present after the user converts a reference-derived draft to a circular
+   * approximation. This retains the source preset (including its original
+   * vector and provenance) for disclosure, but it is not propagated; the
+   * circular state built from altitude/speed is used instead.
+   */
+  derivedFrom?: ReferencePreset;
 };
 
 /**
@@ -44,7 +60,11 @@ export type ScenarioInputs = {
  * numeric range and inside a step count that stays responsive in a browser.
  */
 export const INPUT_LIMITS = {
-  altitudeKm: { min: 200, max: 20_000 },
+  /**
+   * Includes geostationary reference states (about 35,786 km). The engine's
+   * numeric range is much wider; this is the editable UI range.
+   */
+  altitudeKm: { min: 200, max: 50_000 },
   speedKmPerS: { min: 0.5, max: 15 },
   orbitCount: { min: 0.5, max: 6 },
   timestepSeconds: { min: 1, max: 60 },
@@ -79,10 +99,16 @@ export type ScenarioReference = {
 
 /** Values a user can compare against, all derived from the engine's utilities. */
 export function scenarioReference(inputs: ScenarioInputs): ScenarioReference {
-  const radiusKm = EARTH_MEAN_RADIUS_KM + inputs.altitudeKm;
+  const referenceState = inputs.reference?.state;
+  const radiusKm = referenceState
+    ? magnitude(referenceState.positionKm)
+    : EARTH_MEAN_RADIUS_KM + inputs.altitudeKm;
   const circularSpeedKmPerS = magnitude(
     createCircularOrbitState(radiusKm, EARTH_MU_KM3_S2).velocityKmPerS,
   );
+  const speedKmPerS = referenceState
+    ? magnitude(referenceState.velocityKmPerS)
+    : inputs.speedKmPerS;
   const timestepSeconds = inputs.timestepSeconds;
   const periodSeconds = circularOrbitalPeriodSeconds(radiusKm, EARTH_MU_KM3_S2);
   const durationSeconds = durationFor(inputs.orbitCount, periodSeconds, timestepSeconds);
@@ -91,7 +117,7 @@ export function scenarioReference(inputs: ScenarioInputs): ScenarioReference {
     radiusKm,
     circularSpeedKmPerS,
     periodSeconds,
-    speedRatio: circularSpeedKmPerS > 0 ? inputs.speedKmPerS / circularSpeedKmPerS : Number.NaN,
+    speedRatio: circularSpeedKmPerS > 0 ? speedKmPerS / circularSpeedKmPerS : Number.NaN,
     durationSeconds,
     timestepSeconds,
     sampleIntervalSeconds: timestepSeconds,
@@ -115,22 +141,35 @@ function durationFor(
 
 /** Builds the configuration passed to the engine. Pure and deterministic. */
 export function buildScenarioConfig(inputs: ScenarioInputs): SimulationConfig {
-  const reference = scenarioReference(inputs);
-  const base = createCircularOrbitState(reference.radiusKm, EARTH_MU_KM3_S2);
-  const factor = inputs.speedKmPerS / reference.circularSpeedKmPerS;
+  const reference = inputs.reference;
+  const derivedFrom = inputs.derivedFrom;
+  const referenceState = reference?.state;
+  const referenceValues = scenarioReference(inputs);
+  const base = createCircularOrbitState(referenceValues.radiusKm, EARTH_MU_KM3_S2);
+  const factor = inputs.speedKmPerS / referenceValues.circularSpeedKmPerS;
+
+  const initialState = referenceState
+    ? {
+        positionKm: { ...referenceState.positionKm },
+        velocityKmPerS: { ...referenceState.velocityKmPerS },
+      }
+    : {
+        positionKm: { ...base.positionKm },
+        velocityKmPerS: scale(base.velocityKmPerS, factor),
+      };
 
   return {
-    label:
-      `Synthetic test particle — ${inputs.altitudeKm} km altitude, ` +
-      `${inputs.speedKmPerS.toFixed(2)} km/s (${reference.speedRatio.toFixed(2)}x circular)`,
+    label: reference
+      ? `${reference.label} — exact cached state, simplified two-body propagation (hypothetical)`
+      : derivedFrom
+        ? `${derivedFrom.label} — circular approximation from cached state, simplified two-body propagation (hypothetical)`
+        : `Synthetic test particle — ${inputs.altitudeKm} km altitude, ` +
+          `${inputs.speedKmPerS.toFixed(2)} km/s (${referenceValues.speedRatio.toFixed(2)}x circular)`,
     centralBody: EARTH_CENTRAL_BODY,
-    initialState: {
-      positionKm: base.positionKm,
-      velocityKmPerS: scale(base.velocityKmPerS, factor),
-    },
+    initialState,
     timestepSeconds: inputs.timestepSeconds,
-    durationSeconds: reference.durationSeconds,
-    sampleIntervalSeconds: reference.sampleIntervalSeconds,
+    durationSeconds: referenceValues.durationSeconds,
+    sampleIntervalSeconds: referenceValues.sampleIntervalSeconds,
     // Stop radius: a sphere of the central body's mean radius. The model has no
     // terrain, atmosphere, or shape, so this is a documented approximation.
     impactRadiusKm: EARTH_MEAN_RADIUS_KM,
@@ -162,22 +201,30 @@ function rangeIssue(
  */
 export function validateScenarioInputs(inputs: ScenarioInputs): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
+  const reference = inputs.reference;
 
   const checks: Array<ValidationIssue | null> = [
-    rangeIssue(
-      'Altitude',
-      inputs.altitudeKm,
-      'km',
-      INPUT_LIMITS.altitudeKm.min,
-      INPUT_LIMITS.altitudeKm.max,
-    ),
-    rangeIssue(
-      'Initial speed',
-      inputs.speedKmPerS,
-      'km/s',
-      INPUT_LIMITS.speedKmPerS.min,
-      INPUT_LIMITS.speedKmPerS.max,
-    ),
+    // A reference preset is validated through its exact state below. The
+    // altitude/speed fields are derived display values and may legitimately be
+    // outside the circular-scenario range (for example, geostationary).
+    ...(reference
+      ? []
+      : [
+          rangeIssue(
+            'Altitude',
+            inputs.altitudeKm,
+            'km',
+            INPUT_LIMITS.altitudeKm.min,
+            INPUT_LIMITS.altitudeKm.max,
+          ),
+          rangeIssue(
+            'Initial speed',
+            inputs.speedKmPerS,
+            'km/s',
+            INPUT_LIMITS.speedKmPerS.min,
+            INPUT_LIMITS.speedKmPerS.max,
+          ),
+        ]),
     rangeIssue(
       'Revolutions',
       inputs.orbitCount,
@@ -212,10 +259,48 @@ export function scenarioInputsAreValid(inputs: ScenarioInputs): boolean {
 }
 
 /**
+ * Builds editable scenario inputs from a validated cached reference state.
+ * The exact vector is retained; altitude and speed are derived display values
+ * that become the circular-approximation parameters if the user edits them.
+ */
+export function inputsFromReferencePreset(
+  preset: ReferencePreset,
+  settings: Pick<ScenarioInputs, 'orbitCount' | 'timestepSeconds'>,
+): ScenarioInputs {
+  const radiusKm = magnitude(preset.state.positionKm);
+  const speedKmPerS = magnitude(preset.state.velocityKmPerS);
+  return {
+    altitudeKm: radiusKm - EARTH_MEAN_RADIUS_KM,
+    speedKmPerS,
+    orbitCount: settings.orbitCount,
+    timestepSeconds: settings.timestepSeconds,
+    reference: {
+      ...preset,
+      state: {
+        positionKm: { ...preset.state.positionKm },
+        velocityKmPerS: { ...preset.state.velocityKmPerS },
+      },
+    },
+  };
+}
+
+/**
  * One-line description of a parameter set, used to label which run a record
  * belongs to. Plain text only: no simulation values are inferred here.
  */
 export function describeScenarioInputs(inputs: ScenarioInputs): string {
+  if (inputs.reference) {
+    return (
+      `${inputs.reference.label} · ${inputs.orbitCount}x reference period · ` +
+      `${inputs.timestepSeconds} s step`
+    );
+  }
+  if (inputs.derivedFrom) {
+    return (
+      `${inputs.derivedFrom.label} · circular approximation · ${inputs.orbitCount}x reference period · ` +
+      `${inputs.timestepSeconds} s step`
+    );
+  }
   return (
     `${inputs.altitudeKm} km altitude · ${inputs.speedKmPerS.toFixed(4)} km/s · ` +
     `${inputs.orbitCount}x reference period · ${inputs.timestepSeconds} s step`

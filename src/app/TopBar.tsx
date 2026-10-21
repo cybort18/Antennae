@@ -8,6 +8,7 @@ import type { CandidateRunState, RecordRole, ScenarioRecord } from '../compariso
 import { Button, Chip } from '../components/ui';
 import { formatInteger } from '../results/format';
 import { describeIntegrator, describeModel, describeWarning } from '../results/labels';
+import { ModeTabs, type WorkspaceMode } from './ModeTabs';
 
 export type TopBarProps = {
   record: ScenarioRecord;
@@ -19,6 +20,7 @@ export type TopBarProps = {
   onChangeView: (view: RecordRole) => void;
   candidateAvailable: boolean;
   candidateRunState: CandidateRunState;
+  onChangeMode: (mode: WorkspaceMode) => void;
 };
 
 function roleLabel(role: RecordRole): string {
@@ -35,6 +37,7 @@ export function TopBar({
   onChangeView,
   candidateAvailable,
   candidateRunState,
+  onChangeMode,
 }: TopBarProps) {
   const { result } = record;
   const stopped = result.status === 'stopped';
@@ -43,9 +46,12 @@ export function TopBar({
   return (
     <header className="topbar">
       <div className="topbar__brand">
+        <span className="topbar__mark" aria-hidden="true" />
         <span className="topbar__title">Antennae</span>
         <span className="topbar__product">Space Sandbox</span>
       </div>
+
+      <ModeTabs mode="lab" onChange={onChangeMode} />
 
       <div className="topbar__scenario">
         <p className="topbar__label" title={result.label}>
@@ -60,6 +66,21 @@ export function TopBar({
           <Chip tone="neutral" title={describeIntegrator(result.integrator)}>
             KDK leapfrog · {result.timestepSeconds} s step
           </Chip>
+          {record.inputs.reference ? (
+            <Chip
+              tone="info"
+              title={`Exact cached ${record.inputs.reference.provenance.provider} state for ${record.inputs.reference.provenance.targetName}; trajectory is hypothetical`}
+            >
+              Exact JPL reference
+            </Chip>
+          ) : record.inputs.derivedFrom ? (
+            <Chip
+              tone="info"
+              title={`Circular approximation derived from cached ${record.inputs.derivedFrom.provenance.provider} state for ${record.inputs.derivedFrom.provenance.targetName}; trajectory is hypothetical`}
+            >
+              Circular approx. from reference
+            </Chip>
+          ) : null}
           {stopped ? (
             <Chip
               tone="danger"

@@ -5,9 +5,9 @@
  * These presets are SYNTHETIC idealizations constructed from the documented
  * constants in constants.ts (a perfect circular orbit around a point-mass
  * Earth). They are NOT NASA/JPL-sourced state vectors, they correspond to no
- * specific real spacecraft, and they carry no epoch. A reference-data preset
- * with real provenance (source, target id, epoch, frame, retrieval date) is a
- * later milestone; see docs/DATA_SOURCES.md.
+ * specific real spacecraft, and they carry no epoch. A cached reference preset
+ * with real provenance (source, target id, epoch, frame, retrieval date) now
+ * exists separately in src/data/; the presets in this file remain synthetic.
  */
 
 import { EARTH_MEAN_RADIUS_KM, EARTH_MU_KM3_S2 } from './constants';

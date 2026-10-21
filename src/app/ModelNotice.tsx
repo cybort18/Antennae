@@ -7,6 +7,7 @@
  */
 
 import { Panel } from '../components/ui';
+import type { ReferencePreset } from '../data/types';
 import { formatNumber } from '../results/format';
 import { DISPLAY_SCALE_NOTE } from '../scene/displayScale';
 import type { SimulationResult } from '../simulation';
@@ -15,12 +16,28 @@ export type ModelNoticeProps = {
   result: SimulationResult;
   /** Reference body radius used for altitude and the stop radius, km. */
   bodyRadiusKm: number;
+  /** Present when the displayed run uses a cached reference state exactly. */
+  reference?: ReferencePreset | null;
+  /** Present when the run is a circular approximation derived from a cached state. */
+  derivedFrom?: ReferencePreset | null;
 };
 
-export function ModelNotice({ result, bodyRadiusKm }: ModelNoticeProps) {
+export function ModelNotice({
+  result,
+  bodyRadiusKm,
+  reference = null,
+  derivedFrom = null,
+}: ModelNoticeProps) {
+  const source = reference ?? derivedFrom;
   return (
     <Panel title="Model & limitations" subtitle="Read before interpreting any number">
-      <dl className="notice">
+      <p className="note">
+        Simplified two-body model; not an ephemeris or operational predictor. Open for units, frame,
+        provenance, scale, and imagery credits.
+      </p>
+      <details className="model-disclosure">
+        <summary>Read model limitations and provenance</summary>
+        <dl className="notice">
         <dt>Model</dt>
         <dd>
           Simplified two-body point-mass gravity: a massless test particle around a fixed central
@@ -38,6 +55,9 @@ export function ModelNotice({ result, bodyRadiusKm }: ModelNoticeProps) {
           Earth-centered inertial axes ({result.frame.id}), origin at the central body's centre of
           mass, right-handed, +z toward the north rotation axis. No epoch is attached and no
           precession / Earth-orientation handling exists: states are relative to t = 0 of this run.
+          {source
+            ? ` The cached reference state is expressed in ${source.provenance.frame} at ${source.provenance.epochTdb}; those labels are provenance metadata, not a transformation performed by this model.`
+            : ''}
         </dd>
 
         <dt>Integrator</dt>
@@ -56,8 +76,34 @@ export function ModelNotice({ result, bodyRadiusKm }: ModelNoticeProps) {
 
         <dt>Preset provenance</dt>
         <dd>
-          Synthetic educational idealization built from recorded Earth constants. <strong>Not NASA/JPL
-          observational data</strong>, no real spacecraft, no launch epoch, no ephemeris.
+          {reference ? (
+            <>
+              Cached <strong>NASA/JPL Horizons</strong> reference state for{' '}
+              {reference.provenance.targetName} ({reference.provenance.targetId}) at{' '}
+              {reference.provenance.epochTdb}, {reference.provenance.frame},{' '}
+              {reference.provenance.center}; units {reference.provenance.units.distance},{' '}
+              {reference.provenance.units.time}, {reference.provenance.units.velocity}. Retrieved{' '}
+              {reference.provenance.retrievedAt}. The initial vector is provider data; the simulated
+              trajectory is a <strong>hypothetical two-body propagation, not the satellite's real
+              ephemeris</strong>. No live request is made at runtime.
+            </>
+          ) : derivedFrom ? (
+            <>
+              This is a <strong>circular approximation derived from a cached NASA/JPL Horizons
+              reference state</strong> for {derivedFrom.provenance.targetName} (
+              {derivedFrom.provenance.targetId}) at {derivedFrom.provenance.epochTdb},{' '}
+              {derivedFrom.provenance.frame}, {derivedFrom.provenance.center}. The original provider
+              vector is retained in the record but is not propagated; the circular initial state is a
+              user edit. The simulated trajectory is a <strong>hypothetical two-body propagation, not
+              the satellite's real ephemeris</strong>. No live request is made at runtime.
+            </>
+          ) : (
+            <>
+              Synthetic educational idealization built from recorded Earth constants.{' '}
+              <strong>Not NASA/JPL observational data</strong>, no real spacecraft, no launch epoch,
+              no ephemeris.
+            </>
+          )}
         </dd>
 
         <dt>Playback</dt>
@@ -85,12 +131,33 @@ export function ModelNotice({ result, bodyRadiusKm }: ModelNoticeProps) {
         <dt>Scale</dt>
         <dd>{DISPLAY_SCALE_NOTE} The viewport is labelled NOT TO SCALE.</dd>
 
+        <dt>Imagery</dt>
+        <dd>
+          Earth surface and cloud textures are static NASA Blue Marble visualization assets, not
+          current weather or a physical model. Surface:{' '}
+          <a
+            href="https://earthobservatory.nasa.gov/features/BlueMarble"
+            target="_blank"
+            rel="noreferrer"
+          >
+            NASA Earth Observatory, Blue Marble: Next Generation
+          </a>
+          , produced by Reto Stöckli (NASA Goddard Space Flight Center). Clouds: NASA Earth
+          Observatory Blue Marble Clouds. NASA media usage guidance:{' '}
+          <a href="https://www.nasa.gov/nasa-brand-center/images-and-media/" target="_blank" rel="noreferrer">
+            NASA Images and Media Usage Guidelines
+          </a>
+          . No NASA insignia or logo is used. Both textures are stored locally and served from this app;
+          the app makes no remote or provider texture request at runtime.
+        </dd>
+
         <dt>Not for operational use</dt>
         <dd>
           Not a flight-safety, navigation, collision-risk, or impact-prediction tool. Do not use these
           numbers for real mission decisions.
         </dd>
-      </dl>
+        </dl>
+      </details>
     </Panel>
   );
 }

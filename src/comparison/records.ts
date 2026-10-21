@@ -11,6 +11,7 @@
  * rather than a convention.
  */
 
+import type { ReferencePreset } from '../data/types';
 import type { SimulationConfig, SimulationResult, ValidationIssue } from '../simulation';
 import { evaluateScenario, type ScenarioEvaluation } from '../scenarios/evaluateScenario';
 import {
@@ -50,6 +51,47 @@ export type ComparisonState = {
 /** Relation between the editable parameters and the candidate record. */
 export type CandidateRunState = 'not-run' | 'in-sync' | 'unrun-changes';
 
+function clonePreset(preset: ReferencePreset): ReferencePreset {
+  return {
+    ...preset,
+    state: {
+      positionKm: { ...preset.state.positionKm },
+      velocityKmPerS: { ...preset.state.velocityKmPerS },
+    },
+  };
+}
+
+/** Copies optional nested reference vectors so records never share mutable values. */
+function cloneScenarioInputs(inputs: ScenarioInputs): ScenarioInputs {
+  return {
+    ...inputs,
+    ...(inputs.reference ? { reference: clonePreset(inputs.reference) } : {}),
+    ...(inputs.derivedFrom ? { derivedFrom: clonePreset(inputs.derivedFrom) } : {}),
+  };
+}
+
+function sameVec3(a: { x: number; y: number; z: number }, b: { x: number; y: number; z: number }): boolean {
+  return a.x === b.x && a.y === b.y && a.z === b.z;
+}
+
+function sameReferenceState(a: ScenarioInputs, b: ScenarioInputs): boolean {
+  if (!a.reference || !b.reference) {
+    return a.reference === b.reference;
+  }
+  return (
+    a.reference.id === b.reference.id &&
+    sameVec3(a.reference.state.positionKm, b.reference.state.positionKm) &&
+    sameVec3(a.reference.state.velocityKmPerS, b.reference.state.velocityKmPerS)
+  );
+}
+
+function sameDerivedFrom(a: ScenarioInputs, b: ScenarioInputs): boolean {
+  if (!a.derivedFrom || !b.derivedFrom) {
+    return a.derivedFrom === b.derivedFrom;
+  }
+  return a.derivedFrom.id === b.derivedFrom.id;
+}
+
 export function createRecord(
   role: RecordRole,
   inputs: ScenarioInputs,
@@ -60,7 +102,7 @@ export function createRecord(
   }
   return {
     role,
-    inputs: { ...inputs },
+    inputs: cloneScenarioInputs(inputs),
     config: evaluation.config,
     result: evaluation.result,
   };
@@ -84,7 +126,21 @@ export function initialComparisonState(
   return {
     baseline,
     candidate: null,
-    draft: { ...inputs },
+    draft: cloneScenarioInputs(inputs),
+    lastRunIssues: null,
+    lastRunEngineError: null,
+  };
+}
+
+/**
+ * Replaces the candidate draft with a complete parameter set without running it.
+ * Used by the cached reference-preset loader; the baseline and any existing
+ * candidate record remain untouched.
+ */
+export function replaceDraft(state: ComparisonState, inputs: ScenarioInputs): ComparisonState {
+  return {
+    ...state,
+    draft: cloneScenarioInputs(inputs),
     lastRunIssues: null,
     lastRunEngineError: null,
   };
@@ -93,9 +149,23 @@ export function initialComparisonState(
 /**
  * Edits the candidate parameters only. Nothing is integrated here, and the
  * baseline, the candidate record, and every result object are left untouched.
+ *
+ * Editing altitude or speed detaches the exact provider state and records the
+ * source preset as `derivedFrom`: the engine must use the circular parameters,
+ * but the edited scenario must remain visibly reference-derived and retain the
+ * original provider vector for comparison.
  */
 export function editDraft(state: ComparisonState, patch: Partial<ScenarioInputs>): ComparisonState {
-  return { ...state, draft: { ...state.draft, ...patch } };
+  const nextDraft: ScenarioInputs = { ...state.draft, ...patch };
+  if (
+    state.draft.reference &&
+    (Object.prototype.hasOwnProperty.call(patch, 'altitudeKm') ||
+      Object.prototype.hasOwnProperty.call(patch, 'speedKmPerS'))
+  ) {
+    nextDraft.derivedFrom = state.draft.reference;
+    delete nextDraft.reference;
+  }
+  return { ...state, draft: nextDraft };
 }
 
 /**
@@ -137,7 +207,7 @@ export function runCandidate(state: ComparisonState): ComparisonState {
  * reproduces the baseline numbers exactly.
  */
 export function restoreDraftFromBaseline(state: ComparisonState): ComparisonState {
-  return runCandidate({ ...state, draft: { ...state.baseline.inputs } });
+  return runCandidate({ ...state, draft: cloneScenarioInputs(state.baseline.inputs) });
 }
 
 /**
@@ -158,7 +228,7 @@ export function promoteCandidateToBaseline(state: ComparisonState): ComparisonSt
     ...state,
     baseline: { ...candidate, role: 'baseline' },
     candidate: null,
-    draft: { ...candidate.inputs },
+    draft: cloneScenarioInputs(candidate.inputs),
     lastRunIssues: null,
     lastRunEngineError: null,
   };
@@ -184,7 +254,9 @@ export function sameInputs(a: ScenarioInputs, b: ScenarioInputs): boolean {
     a.altitudeKm === b.altitudeKm &&
     a.speedKmPerS === b.speedKmPerS &&
     a.orbitCount === b.orbitCount &&
-    a.timestepSeconds === b.timestepSeconds
+    a.timestepSeconds === b.timestepSeconds &&
+    sameReferenceState(a, b) &&
+    sameDerivedFrom(a, b)
   );
 }
 

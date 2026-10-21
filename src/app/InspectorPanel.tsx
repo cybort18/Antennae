@@ -130,6 +130,12 @@ export function InspectorPanel({
           {recordChips(baseline)}
         </div>
         <p className="record-block__params">{describeScenarioInputs(baseline.inputs)}</p>
+        {baseline.inputs.reference ? (
+          <p className="note">
+            This baseline uses a cached {baseline.inputs.reference.provenance.provider} reference
+            state. The simulated path is a hypothetical two-body propagation, not a real ephemeris.
+          </p>
+        ) : null}
         <div className="metrics metrics--compact">
           <MetricRow
             label="Requested duration"
@@ -200,39 +206,132 @@ export function InspectorPanel({
         <p className="note">No candidate run yet for the current parameter set.</p>
       ) : null}
 
-      <NumberField
-        id="altitude"
-        label="Initial altitude"
-        unit="km"
-        value={draft.altitudeKm}
-        min={INPUT_LIMITS.altitudeKm.min}
-        max={INPUT_LIMITS.altitudeKm.max}
-        step={10}
-        showSlider
-        onCommit={(altitudeKm) => onChange({ altitudeKm })}
-      />
+      {draft.reference ? (
+        <div className="record-block">
+          <div className="record-block__head">
+            <span className="record-block__name">Cached reference state</span>
+            <Chip tone="info">Exact provider vector</Chip>
+          </div>
+          <p className="record-block__params">{draft.reference.label}</p>
+          <div className="metrics metrics--compact">
+            <MetricRow
+              label="Target"
+              value={`${draft.reference.provenance.targetName} (${draft.reference.provenance.targetId})`}
+            />
+            <MetricRow label="Epoch (metadata)" value={draft.reference.provenance.epochTdb} />
+            <MetricRow
+              label="Frame / centre"
+              value={`${draft.reference.provenance.frame} · ${draft.reference.provenance.center}`}
+            />
+            <MetricRow
+              label="Units"
+              value={`${draft.reference.provenance.units.distance} · ${draft.reference.provenance.units.time} · ${draft.reference.provenance.units.velocity}`}
+            />
+            <MetricRow label="Retrieved" value={draft.reference.provenance.retrievedAt} />
+            <MetricRow
+              label="Reference radius altitude"
+              value={`${formatNumber(draftReference.radiusKm - bodyRadiusKm, 3)} km`}
+            />
+            <MetricRow
+              label="Reference speed magnitude"
+              value={`${formatNumber(
+                Math.hypot(
+                  draft.reference.state.velocityKmPerS.x,
+                  draft.reference.state.velocityKmPerS.y,
+                  draft.reference.state.velocityKmPerS.z,
+                ),
+                6,
+              )} km/s`}
+            />
+          </div>
+          <div className="metrics metrics--compact">
+            <MetricRow
+              label="Cached position (km)"
+              value={`${formatNumber(draft.reference.state.positionKm.x, 6)}, ${formatNumber(
+                draft.reference.state.positionKm.y,
+                6,
+              )}, ${formatNumber(draft.reference.state.positionKm.z, 6)}`}
+            />
+            <MetricRow
+              label="Cached velocity (km/s)"
+              value={`${formatNumber(draft.reference.state.velocityKmPerS.x, 9)}, ${formatNumber(
+                draft.reference.state.velocityKmPerS.y,
+                9,
+              )}, ${formatNumber(draft.reference.state.velocityKmPerS.z, 9)}`}
+            />
+          </div>
+          <p className="note">
+            This candidate uses the exact cached vector. The two-body trajectory is a hypothetical
+            propagation, not the satellite's real ephemeris. Editing altitude or speed detaches the
+            exact vector from propagation, retains it as provenance, and converts the candidate to a
+            circular approximation.
+          </p>
+          <div className="field__actions">
+            <Button
+              onClick={() =>
+                onChange({
+                  altitudeKm: draft.altitudeKm,
+                  speedKmPerS: draft.speedKmPerS,
+                })
+              }
+              title="Detach the exact reference vector from propagation and use a circular state at its radius and speed"
+            >
+              Convert to circular approximation
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <>
+          {draft.derivedFrom ? (
+            <div className="record-block" role="status">
+              <div className="record-block__head">
+                <span className="record-block__name">Circular approximation</span>
+                <Chip tone="info">Reference-derived</Chip>
+              </div>
+              <p className="note">
+                Derived from {draft.derivedFrom.label} ({draft.derivedFrom.provenance.provider}{' '}
+                {draft.derivedFrom.provenance.targetId}, {draft.derivedFrom.provenance.epochTdb}).
+                The original cached vector is retained in this scenario's provenance but is no longer
+                propagated. These circular parameters are a user edit; the resulting trajectory is
+                hypothetical.
+              </p>
+            </div>
+          ) : null}
+          <NumberField
+            id="altitude"
+            label="Initial altitude"
+            unit="km"
+            value={draft.altitudeKm}
+            min={INPUT_LIMITS.altitudeKm.min}
+            max={INPUT_LIMITS.altitudeKm.max}
+            step={10}
+            showSlider
+            onCommit={(altitudeKm) => onChange({ altitudeKm })}
+          />
 
-      <NumberField
-        id="speed"
-        label="Initial tangential speed"
-        unit="km/s"
-        value={draft.speedKmPerS}
-        min={INPUT_LIMITS.speedKmPerS.min}
-        max={INPUT_LIMITS.speedKmPerS.max}
-        step={0.01}
-        showSlider
-        onCommit={(speedKmPerS) => onChange({ speedKmPerS })}
-        hint={`Circular speed at this altitude: ${formatNumber(draftReference.circularSpeedKmPerS, 3)} km/s (= 1.00x). Current: ${formatNumber(draftReference.speedRatio, 2)}x circular.`}
-      />
+          <NumberField
+            id="speed"
+            label="Initial tangential speed"
+            unit="km/s"
+            value={draft.speedKmPerS}
+            min={INPUT_LIMITS.speedKmPerS.min}
+            max={INPUT_LIMITS.speedKmPerS.max}
+            step={0.01}
+            showSlider
+            onCommit={(speedKmPerS) => onChange({ speedKmPerS })}
+            hint={`Circular speed at this altitude: ${formatNumber(draftReference.circularSpeedKmPerS, 3)} km/s (= 1.00x). Current: ${formatNumber(draftReference.speedRatio, 2)}x circular.`}
+          />
 
-      <div className="field__actions">
-        <Button
-          onClick={() => onChange({ speedKmPerS: Number(draftReference.circularSpeedKmPerS.toFixed(3)) })}
-          title="Set the initial speed to the circular speed for the current altitude"
-        >
-          Use circular speed
-        </Button>
-      </div>
+          <div className="field__actions">
+            <Button
+              onClick={() => onChange({ speedKmPerS: Number(draftReference.circularSpeedKmPerS.toFixed(3)) })}
+              title="Set the initial speed to the circular speed for the current altitude"
+            >
+              Use circular speed
+            </Button>
+          </div>
+        </>
+      )}
 
       <div className="field">
         <label className="field__label" htmlFor="revolutions">
@@ -251,6 +350,24 @@ export function InspectorPanel({
           ))}
         </select>
       </div>
+
+      <div className="field__actions">
+        <Button
+          variant="primary"
+          onClick={onRunCandidate}
+          title={
+            draftIssues.length > 0
+              ? 'These parameters are outside the supported range; running reports the messages above and changes nothing'
+              : 'Integrate these parameters as the candidate run'
+          }
+        >
+          Run candidate
+        </Button>
+      </div>
+      <p className="note">
+        Running the candidate integrates the parameters above with the same engine, timestep, and
+        integrator as the baseline. The baseline is never modified by a candidate run.
+      </p>
 
       <div className="metrics metrics--compact">
         <MetricRow label="Orbit radius" value={`${formatNumber(draftReference.radiusKm, 1)} km`} />
@@ -291,24 +408,6 @@ export function InspectorPanel({
       {lastRunEngineError ? (
         <p className="note note--attention">Engine error: {lastRunEngineError}</p>
       ) : null}
-
-      <div className="field__actions">
-        <Button
-          variant="primary"
-          onClick={onRunCandidate}
-          title={
-            draftIssues.length > 0
-              ? 'These parameters are outside the supported range; running reports the messages above and changes nothing'
-              : 'Integrate these parameters as the candidate run'
-          }
-        >
-          Run candidate
-        </Button>
-      </div>
-      <p className="note">
-        Running the candidate integrates the parameters above with the same engine, timestep, and
-        integrator as the baseline. The baseline is never modified by a candidate run.
-      </p>
     </Panel>
   );
 }

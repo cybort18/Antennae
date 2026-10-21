@@ -16,10 +16,24 @@ import {
   DEFAULT_SCENARIO_INPUTS,
   INPUT_LIMITS,
   buildScenarioConfig,
+  describeScenarioInputs,
+  inputsFromReferencePreset,
   scenarioReference,
   validateScenarioInputs,
   type ScenarioInputs,
 } from '../scenarioInputs';
+import { loadReferencePresets } from '../../data/referencePresets';
+
+function referenceInputs(): ScenarioInputs {
+  const loaded = loadReferencePresets();
+  if (loaded.error || !loaded.presets[0]) {
+    throw new Error(`Reference fixture must load: ${loaded.error ?? 'missing preset'}`);
+  }
+  return inputsFromReferencePreset(loaded.presets[0], {
+    orbitCount: 1,
+    timestepSeconds: 10,
+  });
+}
 
 describe('buildScenarioConfig', () => {
   it('produces a configuration the engine accepts without issues', () => {
@@ -81,6 +95,42 @@ describe('buildScenarioConfig', () => {
   });
 });
 
+describe('cached reference inputs', () => {
+  it('uses the exact provider state, not a circular reconstruction', () => {
+    const inputs = referenceInputs();
+    const config = buildScenarioConfig(inputs);
+
+    expect(config.initialState).toEqual(inputs.reference?.state);
+    expect(config.initialState.positionKm).not.toBe(inputs.reference?.state.positionKm);
+    expect(config.initialState.velocityKmPerS).not.toBe(inputs.reference?.state.velocityKmPerS);
+    expect(config.initialState.positionKm.z).toBeCloseTo(-170.859408, 6);
+    expect(config.initialState.velocityKmPerS.y).toBeCloseTo(0.700100006, 9);
+  });
+
+  it('accepts a geostationary-scale state and reports its derived radius and speed ratio', () => {
+    const inputs = referenceInputs();
+    const reference = scenarioReference(inputs);
+
+    expect(inputs.altitudeKm).toBeCloseTo(35786.962, 3);
+    expect(inputs.altitudeKm).toBeGreaterThan(20_000);
+    expect(validateScenarioInputs(inputs)).toEqual([]);
+    expect(reference.radiusKm).toBeCloseTo(42157.962, 3);
+    expect(reference.speedRatio).toBeCloseTo(1, 3);
+    expect(reference.durationSeconds % inputs.timestepSeconds).toBe(0);
+  });
+
+  it('labels the run as a cached reference and a hypothetical propagation', () => {
+    const inputs = referenceInputs();
+    const config = buildScenarioConfig(inputs);
+
+    expect(config.label).toContain('GOES-16');
+    expect(config.label).toContain('hypothetical');
+    expect(config.label).not.toContain('Synthetic test particle');
+    expect(describeScenarioInputs(inputs)).toContain('GOES-16');
+    expect(describeScenarioInputs(inputs)).toContain('cached JPL Horizons');
+  });
+});
+
 describe('scenarioReference', () => {
   it('starts at exactly one circular speed at the default altitude', () => {
     const reference = scenarioReference(DEFAULT_SCENARIO_INPUTS);
@@ -111,7 +161,7 @@ describe('validateScenarioInputs', () => {
 
   const cases: Array<{ name: string; patch: Partial<ScenarioInputs>; field: string }> = [
     { name: 'altitude below the supported range', patch: { altitudeKm: 100 }, field: 'Altitude' },
-    { name: 'altitude above the supported range', patch: { altitudeKm: 25_000 }, field: 'Altitude' },
+    { name: 'altitude above the supported range', patch: { altitudeKm: 60_000 }, field: 'Altitude' },
     { name: 'non-finite altitude', patch: { altitudeKm: Number.NaN }, field: 'Altitude' },
     { name: 'speed below the supported range', patch: { speedKmPerS: 0.1 }, field: 'Initial speed' },
     { name: 'speed above the supported range', patch: { speedKmPerS: 40 }, field: 'Initial speed' },

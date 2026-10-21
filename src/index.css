@@ -4,30 +4,31 @@
  */
 
 :root {
-  --bg: #070c14;
-  --bg-panel: #0d1626;
-  --bg-panel-alt: #101c2e;
-  --bg-input: #0a1322;
-  --border: #1b2c45;
-  --border-strong: #2a4463;
-  --text: #dce8f5;
-  --text-muted: #90a8c2;
-  --text-dim: #667f9c;
-  --accent: #5ad1e6;
-  --accent-soft: #7ef0ff;
-  --accent-2: #7aa2f7;
-  --ok: #4cc38a;
-  --warn: #f0b429;
-  --danger: #f2686b;
-  --radius: 10px;
-  --radius-sm: 6px;
-  --gap: 10px;
+  --bg: #03060b;
+  --bg-panel: #08111c;
+  --bg-panel-alt: #0b1724;
+  --bg-input: #060d16;
+  --border: rgba(133, 164, 194, 0.16);
+  --border-strong: rgba(133, 164, 194, 0.3);
+  --text: #e7eef6;
+  --text-muted: #9aacbe;
+  --text-dim: #6c8095;
+  --accent: #7bd7e8;
+  --accent-soft: #b9f5ff;
+  --accent-2: #83a8ff;
+  --ok: #63d39a;
+  --warn: #efbd61;
+  --danger: #f27b7d;
+  --radius: 6px;
+  --radius-sm: 4px;
+  --gap: 8px;
   --mono: ui-monospace, 'Cascadia Code', Consolas, 'Courier New', monospace;
 
   color-scheme: dark;
-  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   font-size: 14px;
   line-height: 1.45;
+  font-synthesis: none;
 }
 
 * {

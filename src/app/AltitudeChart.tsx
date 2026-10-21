@@ -37,17 +37,28 @@ export type AltitudeChartProps = {
 export function AltitudeChart({ series, bodyRadiusKm }: AltitudeChartProps) {
   const layout = chartLayout();
 
-  const { timeScale, altitudeScale, timeTicks, altitudeTicks } = useMemo(() => {
-    const time = timeDomain(series);
-    const altitude = altitudeDomain(series);
+  const { timeScale, altitudeScale, timeTicks, altitudeTicks, timeTickStep, altitudeTickStep } =
+    useMemo(() => {
+      const time = timeDomain(series);
+      const altitude = altitudeDomain(series);
+      const nextTimeTicks = niceTicks(time, 6);
+      const nextAltitudeTicks = niceTicks(altitude, 5);
 
-    return {
-      timeScale: createLinearScale(time, { start: layout.plot.left, end: layout.plot.right }),
-      altitudeScale: createAltitudeScale(altitude, layout),
-      timeTicks: niceTicks(time, 6),
-      altitudeTicks: niceTicks(altitude, 4),
-    };
-  }, [series, layout]);
+      return {
+        timeScale: createLinearScale(time, { start: layout.plot.left, end: layout.plot.right }),
+        altitudeScale: createAltitudeScale(altitude, layout),
+        timeTicks: nextTimeTicks,
+        altitudeTicks: nextAltitudeTicks,
+        timeTickStep:
+          nextTimeTicks.length > 1
+            ? Math.abs(nextTimeTicks[1] - nextTimeTicks[0])
+            : undefined,
+        altitudeTickStep:
+          nextAltitudeTicks.length > 1
+            ? Math.abs(nextAltitudeTicks[1] - nextAltitudeTicks[0])
+            : undefined,
+      };
+    }, [series, layout]);
 
   const drawn = useMemo(
     () =>
@@ -117,7 +128,7 @@ export function AltitudeChart({ series, bodyRadiusKm }: AltitudeChartProps) {
               y2={y}
             />
             <text className="chart__tick" x={layout.plot.left - 8} y={y + 4} textAnchor="end">
-              {formatTickValue(tick)}
+              {formatTickValue(tick, altitudeTickStep)}
             </text>
           </g>
         );
@@ -140,7 +151,7 @@ export function AltitudeChart({ series, bodyRadiusKm }: AltitudeChartProps) {
               y={layout.plot.bottom + 16}
               textAnchor="middle"
             >
-              {formatTickValue(tick)}
+              {formatTickValue(tick, timeTickStep)}
             </text>
           </g>
         );

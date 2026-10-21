@@ -2,9 +2,10 @@
 
 This document is a mandatory reference for every change that affects simulation values, orbital states, mission scores, or scientific explanations.
 
-**Implementation status (2026-10-18):** section 2 describes the two-body core that actually exists in
-`src/simulation/` together with its measured test evidence. The remaining sections are contracts that
-apply to current and future work; they are not claims that those capabilities exist.
+**Implementation status (2026-10-21):** section 2 describes the two-body core and cached reference
+state that actually exist in `src/simulation/` and `src/data/` together with its measured test evidence.
+The remaining sections are contracts that apply to current and future work; they are not claims that
+those capabilities exist.
 
 ## 1. Source-of-truth rule
 
@@ -94,20 +95,46 @@ sampled every step, as asserted by `src/simulation/__tests__/circularOrbit.test.
 | Period error against `T = 2*pi*sqrt(r^3/mu)` | 4.28e-5 relative | < 0.5% |
 
 Timestep sensitivity over one orbit (5520 s), measured radial-oscillation reduction per halving of
-the step: 4.00x at dt = 60, 30, 15, and 7.5 s â€” the expected quadratic behavior for this second-order
+the step: 4.00x at dt = 60, 30, 15, and 7.5 s — the expected quadratic behavior for this second-order
 method. Sampled energy deviation also decreased in this case (about 16x per halving), which is
 case-specific and not asserted as a general law.
 
 ### 2.6 Limitations to disclose wherever this model's output is shown
 
 - It is a simplified educational model: no ephemeris accuracy, no real mission planning validity.
-- Presets are synthetic idealizations, not NASA/JPL states, and carry no epoch.
+- The default preset is a synthetic idealization, not a NASA/JPL state, and carries no epoch. The opt-in
+  GOES-16 preset starts from a cached JPL Horizons state vector; its simulated trajectory is still a
+  hypothetical two-body propagation, and the provider epoch is provenance metadata rather than a model
+  input.
 - The energy-based instability stop is valid only for the current conservative force model.
 - Recorded constants still require provenance verification against live sources before being presented
   as sourced data.
 - Nothing here is a flight-safety, navigation, or impact-prediction capability.
 - Displayed geometry is not to scale (marker size and line widths are exaggerated), and playback shows
   recorded samples only — neither affects the physics.
+
+### 2.7 Cached JPL Horizons reference state (Phase 3)
+
+**Status: implemented, with explicit provenance and integrity limits.**
+
+- The one cached preset is a JPL Horizons VECTORS response for GOES-16 (target `-141866`). The fixture records
+  a geometric Cartesian state about the Earth body center (`399`), in ICRF, in km and km/s, at
+  2026-10-20 00:00:00 TDB. The retrieval time, exact query, API signature version, and source URL are stored
+  with the preset. The cached response is parsed and validated; there is no live Horizons request at runtime.
+- The parser rejects malformed tables, non-finite components, multiple states, unsupported frames, units,
+  centers, time scales, and non-geometric output. A rejected fixture produces an unavailable-reference state,
+  not a fallback to another target or a synthetic substitute.
+- When loaded, the **exact** cached vector is used as the engine's `initialState`. The resulting trajectory is a
+  hypothetical two-body propagation. It is **not** the satellite's real ephemeris and is not presented as one.
+- The TDB epoch and ICRF frame are provenance labels. The model does not implement epoch propagation, time-scale
+  conversion, precession/nutation, or a frame rotation; ICRF axes are used directly as the model's
+  Earth-centered inertial axes, and the state instant is treated as t = 0. These approximations are disclosed
+  in the workspace.
+- Editing altitude or speed detaches the exact state and produces a circular approximation from the derived radius
+  and speed. The source preset and its original vector remain attached as provenance (`derivedFrom`), but they are
+  not propagated. The UI labels the conversion, and records remain immutable until an explicit run.
+- The cached state is public NASA/JPL data. Attribution and the query are retained with the preset; the cache
+  is not treated as a live forecast or a continuously updated service.
 
 ## 3. Declare model fidelity
 
@@ -146,7 +173,7 @@ Never combine states from different centers, frames, or epochs without explicit,
 
 ## 6. Derived values and mission checks
 
-All reported values must be calculated from available state/model data. Every metric needs a definition, units, and any applicable preconditions. Do not show fuel remaining unless propellant consumption is modeled. Do not call an orbit â€œstableâ€ from a single attractive-looking screenshot. Do not evaluate â€œreached targetâ€ by visual proximity alone; define target tolerance and compare computed states in compatible frames/units.
+All reported values must be calculated from available state/model data. Every metric needs a definition, units, and any applicable preconditions. Do not show fuel remaining unless propellant consumption is modeled. Do not call an orbit “stable” from a single attractive-looking screenshot. Do not evaluate “reached target” by visual proximity alone; define target tolerance and compare computed states in compatible frames/units.
 
 Mission evaluation should return more than a decorative badge. Prefer structured results such as:
 
@@ -176,6 +203,27 @@ offending state is not recorded, so the playable timeline ends earlier than `com
 states both numbers). Every displayed value is derived from recorded samples or reported by the engine's
 diagnostics, and the preset is labelled as a synthetic idealization rather than NASA/JPL data.
 
+**Visual foundation (Phase 3.5, 2026-10-20).** The Earth surface and cloud images are static, locally hosted
+NASA Blue Marble display assets. They do not represent current weather, define an atmosphere, establish
+rotation, or supply any physical parameter; Earth remains a smooth sphere at the documented mean radius.
+The atmosphere shell, marker halo, deterministic procedural star field, and Orbit/Earth camera framing are
+presentation only. Camera framing and texture orientation never feed back into sampled coordinates, units,
+or records. If a texture fails to load, the scene falls back to the procedural Earth and omits the cloud
+shell without changing simulation state. Chart tick precision now follows the tick step so a near-flat
+low-orbit axis cannot print the same rounded label repeatedly; the underlying recorded series and physical
+units are unchanged.
+
+**Solar System Overview (Phase 3.6, 2026-10-21).** The default Overview is a static reference visualization,
+not a simulation. Its body radii, orbit spacings, and fixed phase angles are display-composition values in
+scene units; they are not physical radii, semi-major axes, orbital elements, epochs, or current positions.
+The screen computes no gravity, no orbits, and no time evolution, and it has no simulated clock. Its data
+module imports nothing from `src/simulation/` or `src/comparison/`, and no Overview value is written into
+the Earth Orbit Lab state. Orbit guides indicate order only. The four local planetary textures are display
+assets with the same status as the Earth images: pixels and appearance do not define mass, radius, rotation,
+atmosphere, or any physical parameter. Venus uses a radar-derived surface map rather than natural colour,
+and Neptune uses an explicitly illustrative texture; the UI labels both. Loading the app on the Overview
+does not execute the two-body engine; the Lab baseline is created only on the first switch to the Lab.
+
 **Comparison honesty (Milestone 3, 2026-10-19).** Baseline and candidate are separate run records, each
 bundling the parameters, engine configuration, and engine result of one run, so a displayed comparison cannot
 mix configurations. Editing parameters is not a result: the engine is called only on an explicit **Run
@@ -204,6 +252,10 @@ Add tests as the physics model grows. At minimum for a two-body MVP:
 8. **Mission evaluator:** explicit pass/fail boundary cases, unavailable metrics, and invalid/unstable run behavior.
 
 Tests need numerical tolerances and explanation. Avoid tests that merely assert the output is a number or that a page renders.
+
+The cached reference parser is covered separately in `src/data/__tests__/`: it checks exact state preservation,
+source/format rejection, frame/center/unit/time-scale rejection, and malformed-table failure. The UI test checks
+that loading the preset does not run the engine and that a run uses the exact cached vector.
 
 ## 9. AI guardrails
 

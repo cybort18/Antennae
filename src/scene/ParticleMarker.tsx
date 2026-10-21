@@ -4,6 +4,7 @@
  */
 
 import { memo } from 'react';
+import { AdditiveBlending } from 'three';
 
 export const ParticleMarker = memo(function ParticleMarker({
   position,
@@ -13,9 +14,22 @@ export const ParticleMarker = memo(function ParticleMarker({
   radiusUnits: number;
 }) {
   return (
-    <mesh name="test-particle" position={position}>
-      <sphereGeometry args={[radiusUnits, 20, 16]} />
-      <meshBasicMaterial color="#8ef6ff" toneMapped={false} />
-    </mesh>
+    <group name="test-particle" position={position}>
+      <mesh>
+        <sphereGeometry args={[radiusUnits, 20, 16]} />
+        <meshBasicMaterial color="#dcffff" toneMapped={false} />
+      </mesh>
+      <mesh scale={2.8}>
+        <sphereGeometry args={[radiusUnits, 20, 16]} />
+        <meshBasicMaterial
+          color="#65e7ff"
+          transparent
+          opacity={0.16}
+          depthWrite={false}
+          blending={AdditiveBlending}
+          toneMapped={false}
+        />
+      </mesh>
+    </group>
   );
 });

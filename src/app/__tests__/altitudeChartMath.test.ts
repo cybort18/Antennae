@@ -127,6 +127,23 @@ describe('formatting', () => {
     expect(formatTickValue(0.5)).toBe('0.5');
   });
 
+  it('uses the tick step to keep close labels distinct', () => {
+    expect(formatTickValue(400, 0.05)).toBe('400');
+    expect(formatTickValue(400.05, 0.05)).toBe('400.05');
+    expect(formatTickValue(400.1, 0.05)).toBe('400.1');
+    expect(formatTickValue(400.2, 0.2)).toBe('400.2');
+  });
+
+  it('produces distinct labels for a nearly flat low-orbit domain', () => {
+    const domain = altitudeDomain([seriesWith([[0, 400], [100, 400.2]])]);
+    const ticks = niceTicks(domain, 5);
+    const step = Math.abs(ticks[1] - ticks[0]);
+    const labels = ticks.map((tick) => formatTickValue(tick, step));
+
+    expect(labels.length).toBeGreaterThan(1);
+    expect(new Set(labels).size).toBe(labels.length);
+  });
+
   it('rounds view coordinates to two decimals', () => {
     expect(roundCoordinate(742.0000001)).toBe(742);
     expect(roundCoordinate(12.3456)).toBe(12.35);
