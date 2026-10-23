@@ -25,6 +25,10 @@ export type StatusBannerProps = {
   engineError: string | null;
   /** Simulated time of the last recorded sample of the displayed run. */
   lastSampleTimeSeconds: number;
+  /** Label for the explicit run action in the active workspace. */
+  runActionLabel?: string;
+  /** Label for the editable parameter set in the active workspace. */
+  draftLabel?: string;
 };
 
 export function StatusBanner({
@@ -34,12 +38,17 @@ export function StatusBanner({
   lastRunIssues,
   engineError,
   lastSampleTimeSeconds,
+  runActionLabel = 'Run candidate',
+  draftLabel = 'Candidate parameters',
 }: StatusBannerProps) {
   const stopped = result.status === 'stopped';
   const stopWarning = result.stopReason
     ? result.warnings.find((warning) => warning.code === result.stopReason)
     : undefined;
   const rejectedRun = lastRunIssues !== null && lastRunIssues.length > 0;
+  // Preserve the established Lab wording while letting the Mission Designer use
+  // its own action name in the same banner.
+  const runSubject = runActionLabel === 'Run candidate' ? 'Candidate run' : runActionLabel;
 
   if (!stopped && !engineError && !rejectedRun && draftIssues.length === 0) {
     return null;
@@ -49,33 +58,33 @@ export function StatusBanner({
     <div className="banners">
       {engineError ? (
         <div className="banner banner--danger" role="alert">
-          <Chip tone="danger">Candidate run failed</Chip>
+          <Chip tone="danger">{runSubject} failed</Chip>
           <p>{engineError}</p>
         </div>
       ) : null}
 
       {rejectedRun ? (
         <div className="banner banner--warn" role="alert">
-          <Chip tone="warn">Candidate run rejected — nothing was integrated</Chip>
+          <Chip tone="warn">{runSubject} rejected — nothing was integrated</Chip>
           <p>
             {lastRunIssues?.length ?? 0} parameter problem
             {(lastRunIssues?.length ?? 0) === 1 ? '' : 's'} blocked the run. The baseline and the
             previous candidate record are unchanged; the parameter messages are listed in the
-            inspector.
+            parameter panel.
           </p>
         </div>
       ) : null}
 
       {!rejectedRun && draftIssues.length > 0 ? (
         <div className="banner banner--warn" role="alert">
-          <Chip tone="warn">Candidate parameters invalid — not integrated</Chip>
+          <Chip tone="warn">{draftLabel} invalid — not integrated</Chip>
           <ul className="banner__list">
             {draftIssues.map((issue) => (
               <li key={`${issue.field}:${issue.message}`}>{issue.message}</li>
             ))}
           </ul>
           <p className="banner__meta">
-            Selecting Run candidate reports this without changing the baseline or the previous
+            Selecting {runActionLabel} reports this without changing the baseline or the previous
             candidate record.
           </p>
         </div>

@@ -3,8 +3,8 @@
  *
  * This screen owns display selection and camera framing only. It has no import
  * from the simulation or comparison layers, and it exposes no playback or
- * parameter controls. The Earth Orbit Lab remains the sole place where the
- * two-body engine is run.
+ * parameter controls. The Earth Orbit Lab and Mission Designer are the separate
+ * surfaces where the two-body engine can be run.
  */
 
 import { useState } from 'react';
@@ -64,8 +64,8 @@ function BodySelector({
           ))}
         </ul>
         <p className="overview-note">
-          These positions are illustrative only. They are not current planetary positions or a
-          computed ephemeris.
+          These positions are static and illustrative only. They are not current planetary
+          positions, a computed ephemeris, or a planetary dynamics simulation.
         </p>
       </div>
     </section>
@@ -163,8 +163,9 @@ function SelectedBodyPanel({
           <p>{SOLAR_SYSTEM_MODE_NOTE}</p>
           <p>{SOLAR_SYSTEM_ORBIT_NOTE}</p>
           <p>
-            The Earth Orbit Lab is separate: it runs the existing two-body test-particle model.
-            This overview does not feed positions or sizes into that engine.
+            The Earth Orbit Lab and Mission Designer are separate surfaces: both use the existing
+            two-body test-particle model. This overview does not feed its illustrative positions or
+            display sizes into that engine.
           </p>
           {texture ? (
             <p>

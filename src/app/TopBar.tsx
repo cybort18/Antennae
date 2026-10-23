@@ -6,16 +6,12 @@
 
 import type { CandidateRunState, RecordRole, ScenarioRecord } from '../comparison/records';
 import { Button, Chip } from '../components/ui';
-import { formatInteger } from '../results/format';
-import { describeIntegrator, describeModel, describeWarning } from '../results/labels';
+import { describeModel, describeWarning } from '../results/labels';
 import { ModeTabs, type WorkspaceMode } from './ModeTabs';
 
 export type TopBarProps = {
+  mode: WorkspaceMode;
   record: ScenarioRecord;
-  sampleIndex: number;
-  playing: boolean;
-  onTogglePlay: () => void;
-  onReset: () => void;
   view: RecordRole;
   onChangeView: (view: RecordRole) => void;
   candidateAvailable: boolean;
@@ -28,11 +24,8 @@ function roleLabel(role: RecordRole): string {
 }
 
 export function TopBar({
+  mode,
   record,
-  sampleIndex,
-  playing,
-  onTogglePlay,
-  onReset,
   view,
   onChangeView,
   candidateAvailable,
@@ -41,7 +34,6 @@ export function TopBar({
 }: TopBarProps) {
   const { result } = record;
   const stopped = result.status === 'stopped';
-  const warningCount = result.warnings.length;
 
   return (
     <header className="topbar">
@@ -51,7 +43,7 @@ export function TopBar({
         <span className="topbar__product">Space Sandbox</span>
       </div>
 
-      <ModeTabs mode="lab" onChange={onChangeMode} />
+      <ModeTabs mode={mode} onChange={onChangeMode} />
 
       <div className="topbar__scenario">
         <p className="topbar__label" title={result.label}>
@@ -60,27 +52,9 @@ export function TopBar({
           {result.label ?? 'Unnamed scenario'}
         </p>
         <div className="topbar__chips">
-          <Chip tone="info" title={describeModel(result.model)}>
+          <Chip tone="neutral" title={describeModel(result.model)}>
             Two-body model
           </Chip>
-          <Chip tone="neutral" title={describeIntegrator(result.integrator)}>
-            KDK leapfrog · {result.timestepSeconds} s step
-          </Chip>
-          {record.inputs.reference ? (
-            <Chip
-              tone="info"
-              title={`Exact cached ${record.inputs.reference.provenance.provider} state for ${record.inputs.reference.provenance.targetName}; trajectory is hypothetical`}
-            >
-              Exact JPL reference
-            </Chip>
-          ) : record.inputs.derivedFrom ? (
-            <Chip
-              tone="info"
-              title={`Circular approximation derived from cached ${record.inputs.derivedFrom.provenance.provider} state for ${record.inputs.derivedFrom.provenance.targetName}; trajectory is hypothetical`}
-            >
-              Circular approx. from reference
-            </Chip>
-          ) : null}
           {stopped ? (
             <Chip
               tone="danger"
@@ -91,11 +65,6 @@ export function TopBar({
           ) : (
             <Chip tone="ok">Completed</Chip>
           )}
-          {warningCount > 0 ? (
-            <Chip tone="warn" title="See the warnings list in the results panel">
-              {warningCount} warning{warningCount === 1 ? '' : 's'}
-            </Chip>
-          ) : null}
           {candidateRunState === 'unrun-changes' ? (
             <Chip tone="warn" title="Candidate parameters changed since the last candidate run">
               Unrun changes
@@ -127,25 +96,6 @@ export function TopBar({
         >
           Candidate
         </Button>
-      </div>
-
-      <div className="topbar__controls">
-        <Button
-          variant="primary"
-          onClick={onTogglePlay}
-          ariaLabel={playing ? 'Pause playback' : 'Run playback'}
-          ariaPressed={playing}
-          title={playing ? 'Pause playback' : 'Run playback of recorded samples'}
-        >
-          {playing ? '❚❚ Pause' : '▶ Run'}
-        </Button>
-        <Button onClick={onReset} title="Return playback to the first recorded sample">
-          ⟲ Reset
-        </Button>
-        <p className="topbar__counter">
-          sample {formatInteger(Math.min(sampleIndex + 1, result.samples.length))} /{' '}
-          {formatInteger(result.samples.length)}
-        </p>
       </div>
     </header>
   );

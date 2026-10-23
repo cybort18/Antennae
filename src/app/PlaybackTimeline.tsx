@@ -45,12 +45,13 @@ export function PlaybackTimeline({
           ◀▲
         </Button>
         <Button
-          variant="primary"
+          variant="default"
           onClick={playback.toggle}
           ariaPressed={playing}
           ariaLabel={playing ? 'Pause playback' : 'Run playback'}
+          title={playing ? 'Pause playback' : 'Play recorded simulation samples'}
         >
-          {playing ? '❚❚ Pause' : '▶ Run'}
+          {playing ? '❚❚ Pause' : '▶ Play'}
         </Button>
         <Button
           onClick={() => playback.stepSamples(1)}

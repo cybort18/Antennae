@@ -59,7 +59,8 @@ function viewportStub(): HTMLElement {
 }
 
 describe('workspace shell', () => {
-  it('renders the app identity, model status, and both objects', () => {
+  it('renders the app identity, model status, and both objects', async () => {
+    const user = userEvent.setup();
     renderEarthLab();
 
     expect(screen.getByText('Antennae')).toBeTruthy();
@@ -68,6 +69,8 @@ describe('workspace shell', () => {
     // Status appears in the top bar and in the results panel.
     expect(screen.getAllByText('Completed').length).toBeGreaterThan(0);
 
+    // Objects are housed in the Objects & data drawer (collapsed by default).
+    await user.click(screen.getByRole('button', { name: /Objects & data/ }));
     expect(screen.getByRole('button', { name: /Test particle/ })).toBeTruthy();
     expect(screen.getByRole('button', { name: /Earth.*central body/ })).toBeTruthy();
   });
@@ -96,6 +99,7 @@ describe('workspace shell', () => {
     const user = userEvent.setup();
     renderEarthLab();
 
+    await user.click(screen.getByRole('button', { name: /Objects & data/ }));
     await user.click(screen.getByRole('button', { name: /Earth.*central body/ }));
 
     expect(screen.getByText('Inspector — Earth')).toBeTruthy();

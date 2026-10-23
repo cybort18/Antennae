@@ -3,7 +3,7 @@
  * never touches the comparison records, playback cursor, or simulation engine.
  */
 
-export type WorkspaceMode = 'overview' | 'lab';
+export type WorkspaceMode = 'overview' | 'lab' | 'mission';
 
 export function ModeTabs({
   mode,
@@ -19,6 +19,7 @@ export function ModeTabs({
         className={mode === 'overview' ? 'mode-tabs__tab is-active' : 'mode-tabs__tab'}
         aria-pressed={mode === 'overview'}
         onClick={() => onChange('overview')}
+        title="Reference visualization: static illustrative positions, no planetary dynamics"
       >
         Solar System
       </button>
@@ -27,8 +28,18 @@ export function ModeTabs({
         className={mode === 'lab' ? 'mode-tabs__tab is-active' : 'mode-tabs__tab'}
         aria-pressed={mode === 'lab'}
         onClick={() => onChange('lab')}
+        title="Open physics sandbox: edit initial conditions and compare recorded two-body runs"
       >
         Earth Orbit Lab
+      </button>
+      <button
+        type="button"
+        className={mode === 'mission' ? 'mode-tabs__tab is-active' : 'mode-tabs__tab'}
+        aria-pressed={mode === 'mission'}
+        onClick={() => onChange('mission')}
+        title="Mission Designer: objective-driven run of the same two-body engine"
+      >
+        Mission Designer
       </button>
     </div>
   );

@@ -63,6 +63,8 @@ describe('cached reference preset', () => {
     const user = userEvent.setup();
     renderEarthLab();
 
+    await user.click(screen.getByRole('button', { name: /Objects & data/ }));
+
     expect(screen.getByText('Reference data')).toBeTruthy();
     expect(screen.getByText(/Cached NASA\/JPL state/)).toBeTruthy();
     expect(screen.getByText('GOES-16 — cached JPL Horizons reference state')).toBeTruthy();
@@ -90,6 +92,7 @@ describe('cached reference preset', () => {
     const user = userEvent.setup();
     renderEarthLab();
 
+    await user.click(screen.getByRole('button', { name: /Objects & data/ }));
     await user.selectOptions(screen.getByLabelText('Revolutions to integrate'), '0.5');
     await user.click(screen.getByRole('button', { name: /Load reference into candidate/ }));
     await user.click(screen.getByRole('button', { name: /Run candidate/ }));
@@ -111,6 +114,7 @@ describe('cached reference preset', () => {
     const user = userEvent.setup();
     renderEarthLab();
 
+    await user.click(screen.getByRole('button', { name: /Objects & data/ }));
     await user.selectOptions(screen.getByLabelText('Revolutions to integrate'), '0.5');
     await user.click(screen.getByRole('button', { name: /Load reference into candidate/ }));
     expect(screen.getByText('Cached reference state')).toBeTruthy();

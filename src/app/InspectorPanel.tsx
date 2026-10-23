@@ -121,79 +121,25 @@ export function InspectorPanel({
   return (
     <Panel
       title="Inspector — Test particle"
-      subtitle="Baseline reference and candidate parameters · text applies on Enter or on blur"
+      subtitle="Candidate parameters and baseline comparison · text applies on Enter or on blur"
     >
-      <h3 className="panel__subheading">Baseline (reference)</h3>
-      <div className="record-block">
-        <div className="record-block__head">
-          <span className="record-block__name">Locked comparison reference</span>
-          {recordChips(baseline)}
-        </div>
-        <p className="record-block__params">{describeScenarioInputs(baseline.inputs)}</p>
-        {baseline.inputs.reference ? (
-          <p className="note">
-            This baseline uses a cached {baseline.inputs.reference.provenance.provider} reference
-            state. The simulated path is a hypothetical two-body propagation, not a real ephemeris.
-          </p>
-        ) : null}
-        <div className="metrics metrics--compact">
-          <MetricRow
-            label="Requested duration"
-            value={`${formatInteger(baseline.result.durationSeconds)} s`}
-          />
-          <MetricRow
-            label="Recorded samples"
-            value={formatInteger(baseline.result.samples.length)}
-          />
-        </div>
-        <div className="field__actions">
-          <Button
-            onClick={onRestoreBaseline}
-            title="Copy the baseline parameters into the candidate and run them"
-          >
-            Restore baseline parameters
-          </Button>
-        </div>
-
-        {candidate ? (
-          <div className="field__actions">
-            <Button
-              onClick={() => setConfirmingBaseline(true)}
-              disabled={confirmingBaseline}
-              title="Replace the current baseline with the candidate record"
-            >
-              Replace baseline with candidate…
-            </Button>
-          </div>
+      <div className="inspector-section-head">
+        <h3 className="panel__subheading">Candidate parameters</h3>
+        {candidateRunState === 'unrun-changes' ? (
+          <Chip tone="warn" title="Candidate parameters differ from the last candidate run">
+            Unrun changes
+          </Chip>
+        ) : candidateRunState === 'in-sync' ? (
+          <Chip tone="ok" title="These parameters match the last candidate run">
+            In sync
+          </Chip>
         ) : (
-          <p className="note">Run a candidate to make it available as a new baseline.</p>
+          <Chip tone="neutral" title="No candidate run yet for the current parameter set">
+            Not run yet
+          </Chip>
         )}
-
-        {confirmingBaseline ? (
-          <div className="confirm" role="alert">
-            <p>
-              Replace the baseline with the current candidate run?
-              <br />
-              The candidate record is then cleared and the viewport returns to the new baseline.
-              This cannot be undone within the session.
-            </p>
-            <div className="field__actions">
-              <Button
-                variant="primary"
-                onClick={() => {
-                  onPromoteCandidate();
-                  setConfirmingBaseline(false);
-                }}
-              >
-                Confirm replace baseline
-              </Button>
-              <Button onClick={() => setConfirmingBaseline(false)}>Cancel</Button>
-            </div>
-          </div>
-        ) : null}
       </div>
 
-      <h3 className="panel__subheading">Candidate parameters</h3>
       {candidateRunState === 'unrun-changes' ? (
         <p className="note note--attention">
           Unrun changes: these parameters differ from the last candidate run.
@@ -201,9 +147,6 @@ export function InspectorPanel({
       ) : null}
       {candidateRunState === 'in-sync' ? (
         <p className="note">These parameters match the last candidate run.</p>
-      ) : null}
-      {candidateRunState === 'not-run' ? (
-        <p className="note">No candidate run yet for the current parameter set.</p>
       ) : null}
 
       {draft.reference ? (
@@ -322,8 +265,9 @@ export function InspectorPanel({
             hint={`Circular speed at this altitude: ${formatNumber(draftReference.circularSpeedKmPerS, 3)} km/s (= 1.00x). Current: ${formatNumber(draftReference.speedRatio, 2)}x circular.`}
           />
 
-          <div className="field__actions">
+          <div className="field__actions field__actions--secondary">
             <Button
+              variant="ghost"
               onClick={() => onChange({ speedKmPerS: Number(draftReference.circularSpeedKmPerS.toFixed(3)) })}
               title="Set the initial speed to the circular speed for the current altitude"
             >
@@ -351,7 +295,7 @@ export function InspectorPanel({
         </select>
       </div>
 
-      <div className="field__actions">
+      <div className="field__actions inspector-cta">
         <Button
           variant="primary"
           onClick={onRunCandidate}
@@ -364,31 +308,37 @@ export function InspectorPanel({
           Run candidate
         </Button>
       </div>
-      <p className="note">
-        Running the candidate integrates the parameters above with the same engine, timestep, and
-        integrator as the baseline. The baseline is never modified by a candidate run.
-      </p>
 
-      <div className="metrics metrics--compact">
+      <div className="metrics metrics--compact inspector-preview-metrics">
         <MetricRow label="Orbit radius" value={`${formatNumber(draftReference.radiusKm, 1)} km`} />
         <MetricRow
           label="Reference period (circular)"
           value={`${formatNumber(draftReference.periodSeconds, 1)} s`}
         />
-        <MetricRow
-          label="Requested duration"
-          value={`${formatInteger(draftReference.durationSeconds)} s`}
-        />
-        <MetricRow
-          label="Samples if completed"
-          value={formatInteger(draftReference.estimatedSampleCount)}
-        />
-        <MetricRow
-          label="Initial-state eccentricity"
-          value={formatNumber(initialEccentricity, 4)}
-          hint="Computed by the engine from the initial state these parameters describe (0 = circular)."
-        />
       </div>
+
+      <details className="inspector-disclosure">
+        <summary>Technical details</summary>
+        <div className="metrics metrics--compact">
+          <MetricRow
+            label="Requested duration"
+            value={`${formatInteger(draftReference.durationSeconds)} s`}
+          />
+          <MetricRow
+            label="Samples if completed"
+            value={formatInteger(draftReference.estimatedSampleCount)}
+          />
+          <MetricRow
+            label="Initial-state eccentricity"
+            value={formatNumber(initialEccentricity, 4)}
+            hint="Computed by the engine from the initial state these parameters describe (0 = circular)."
+          />
+        </div>
+        <p className="note">
+          Running the candidate integrates the parameters above with the same engine, timestep, and
+          integrator as the baseline. The baseline is never modified by a candidate run.
+        </p>
+      </details>
 
       {draftIssues.length > 0 ? (
         <ul className="issues" role="alert">
@@ -408,6 +358,78 @@ export function InspectorPanel({
       {lastRunEngineError ? (
         <p className="note note--attention">Engine error: {lastRunEngineError}</p>
       ) : null}
+
+      <details className="inspector-disclosure">
+        <summary>Baseline reference (locked)</summary>
+        <div className="record-block">
+          <div className="record-block__head">
+            <span className="record-block__name">Locked comparison reference</span>
+            {recordChips(baseline)}
+          </div>
+          <p className="record-block__params">{describeScenarioInputs(baseline.inputs)}</p>
+          {baseline.inputs.reference ? (
+            <p className="note">
+              This baseline uses a cached {baseline.inputs.reference.provenance.provider} reference
+              state. The simulated path is a hypothetical two-body propagation, not a real ephemeris.
+            </p>
+          ) : null}
+          <div className="metrics metrics--compact">
+            <MetricRow
+              label="Requested duration"
+              value={`${formatInteger(baseline.result.durationSeconds)} s`}
+            />
+            <MetricRow
+              label="Recorded samples"
+              value={formatInteger(baseline.result.samples.length)}
+            />
+          </div>
+          <div className="field__actions">
+            <Button
+              onClick={onRestoreBaseline}
+              title="Copy the baseline parameters into the candidate and run them"
+            >
+              Restore baseline parameters
+            </Button>
+          </div>
+
+          {candidate ? (
+            <div className="field__actions">
+              <Button
+                onClick={() => setConfirmingBaseline(true)}
+                disabled={confirmingBaseline}
+                title="Replace the current baseline with the candidate record"
+              >
+                Replace baseline with candidate…
+              </Button>
+            </div>
+          ) : (
+            <p className="note">Run a candidate to make it available as a new baseline.</p>
+          )}
+
+          {confirmingBaseline ? (
+            <div className="confirm" role="alert">
+              <p>
+                Replace the baseline with the current candidate run?
+                <br />
+                The candidate record is then cleared and the viewport returns to the new baseline.
+                This cannot be undone within the session.
+              </p>
+              <div className="field__actions">
+                <Button
+                  variant="primary"
+                  onClick={() => {
+                    onPromoteCandidate();
+                    setConfirmingBaseline(false);
+                  }}
+                >
+                  Confirm replace baseline
+                </Button>
+                <Button onClick={() => setConfirmingBaseline(false)}>Cancel</Button>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      </details>
     </Panel>
   );
 }

@@ -18,10 +18,16 @@ import { GizmoHelper, GizmoViewport, OrbitControls, PerspectiveCamera } from '@r
 import { Button } from '../components/ui';
 import type { SimulationResult } from '../simulation';
 import { EarthSphere } from './EarthSphere';
+import { GoesSpacecraftModel } from './GoesSpacecraftModel';
 import { ParticleMarker } from './ParticleMarker';
 import { Starfield } from './Starfield';
 import { TrajectoryLayer } from './TrajectoryLayer';
 import { DISPLAY_SCALE_NOTE, toScenePoint, toSceneUnits } from './displayScale';
+import {
+  GOES16_MODEL,
+  spacecraftModelAsset,
+  type SpacecraftModelId,
+} from './spacecraftModels';
 
 export type SimulationViewportProps = {
   result: SimulationResult;
@@ -31,6 +37,8 @@ export type SimulationViewportProps = {
   bodyRadiusKm: number;
   /** Largest sampled radius of the current run, km (used to frame the camera). */
   sceneExtentKm: number;
+  /** Render-only spacecraft mesh associated with the displayed record. */
+  spacecraftModel?: SpacecraftModelId | null;
 };
 
 type CameraMode = 'orbit' | 'earth';
@@ -40,11 +48,15 @@ export function SimulationViewport({
   sampleIndex,
   bodyRadiusKm,
   sceneExtentKm,
+  spacecraftModel = null,
 }: SimulationViewportProps) {
   const sampleCount = result.samples.length;
   const safeIndex = Math.min(Math.max(sampleIndex, 0), Math.max(sampleCount - 1, 0));
   const sample = result.samples[safeIndex];
   const [cameraMode, setCameraMode] = useState<CameraMode>('orbit');
+  const [failedModel, setFailedModel] = useState<SpacecraftModelId | null>(null);
+  const modelAsset = spacecraftModelAsset(spacecraftModel);
+  const modelFailed = spacecraftModel !== null && failedModel === spacecraftModel;
 
   const bodyRadiusUnits = toSceneUnits(bodyRadiusKm);
   const sceneExtentUnits = toSceneUnits(sceneExtentKm);
@@ -100,7 +112,16 @@ export function SimulationViewport({
 
         <EarthSphere radiusUnits={bodyRadiusUnits} />
         <TrajectoryLayer result={result} traveledCount={safeIndex + 1} />
-        <ParticleMarker position={markerPosition} radiusUnits={markerRadiusUnits} />
+        {modelAsset ? (
+          <GoesSpacecraftModel
+            position={markerPosition}
+            radiusUnits={markerRadiusUnits}
+            onError={() => setFailedModel(spacecraftModel ?? null)}
+            onReady={() => setFailedModel(null)}
+          />
+        ) : (
+          <ParticleMarker position={markerPosition} radiusUnits={markerRadiusUnits} />
+        )}
 
         <OrbitControls
           key={`controls-${cameraMode}`}
@@ -120,53 +141,74 @@ export function SimulationViewport({
       <div className="viewport__vignette" aria-hidden="true" />
 
       <div className="viewport__overlay viewport__overlay--top-left viewport__overlay--interactive">
-        <div className="viewport__mode" role="group" aria-label="Camera framing">
-          <span className="viewport__mode-label">Frame</span>
-          <Button
-            variant={cameraMode === 'orbit' ? 'primary' : 'ghost'}
-            ariaPressed={cameraMode === 'orbit'}
-            onClick={() => setCameraMode('orbit')}
-            title="Fit the recorded orbit in the viewport"
-          >
-            Orbit
-          </Button>
-          <Button
-            variant={cameraMode === 'earth' ? 'primary' : 'ghost'}
-            ariaPressed={cameraMode === 'earth'}
-            onClick={() => setCameraMode('earth')}
-            title="Zoom toward the fixed central body"
-          >
-            Earth
-          </Button>
-        </div>
-        <div className="viewport__scale-note">
+        <div className="viewport__hud-strip">
+          <div className="viewport__mode" role="group" aria-label="Camera framing">
+            <span className="viewport__mode-label">Frame</span>
+            <Button
+              variant={cameraMode === 'orbit' ? 'primary' : 'ghost'}
+              ariaPressed={cameraMode === 'orbit'}
+              onClick={() => setCameraMode('orbit')}
+              title="Fit the recorded orbit in the viewport"
+            >
+              Orbit
+            </Button>
+            <Button
+              variant={cameraMode === 'earth' ? 'primary' : 'ghost'}
+              ariaPressed={cameraMode === 'earth'}
+              onClick={() => setCameraMode('earth')}
+              title="Zoom toward the fixed central body"
+            >
+              Earth
+            </Button>
+          </div>
           <span className="badge badge--warn" title={DISPLAY_SCALE_NOTE}>
             NOT TO SCALE
           </span>
-          <p className="viewport__hint">{DISPLAY_SCALE_NOTE}</p>
         </div>
       </div>
 
       <div className="viewport__overlay viewport__overlay--top-right">
-        <p className="viewport__stat">Axes: Earth-centered inertial (+z = north)</p>
-        <p className="viewport__hint">Drag to orbit · scroll to zoom</p>
+        <div className="viewport__hud-badge">
+          <span className="viewport__stat">Axes: Earth-centered inertial (+z = north)</span>
+          <span className="viewport__hint">Drag to orbit · scroll to zoom</span>
+        </div>
+        {modelAsset ? (
+          <span
+            className={modelFailed ? 'badge badge--warn' : 'badge'}
+            title={GOES16_MODEL.renderNote}
+          >
+            {modelFailed ? 'GOES mesh unavailable · marker fallback' : 'GOES mesh · render only'}
+          </span>
+        ) : null}
       </div>
 
       <div className="viewport__overlay viewport__overlay--bottom-left">
-        <ul className="legend">
-          <li>
-            <span className="legend__swatch legend__swatch--body" /> Earth (fixed force centre)
-          </li>
-          <li>
-            <span className="legend__swatch legend__swatch--traveled" /> Played-back samples
-          </li>
-          <li>
-            <span className="legend__swatch legend__swatch--path" /> Full recorded path
-          </li>
-          <li>
-            <span className="legend__swatch legend__swatch--marker" /> Test particle (recorded sample)
-          </li>
-        </ul>
+        <details className="viewport__legend-drawer">
+          <summary className="viewport__legend-summary" title="Toggle scene trajectory legend">
+            <span className="legend__swatch legend__swatch--marker" />
+            <span>Scene Legend</span>
+          </summary>
+          <ul className="legend">
+            <li>
+              <span className="legend__swatch legend__swatch--body" /> Earth (fixed force centre)
+            </li>
+            <li>
+              <span className="legend__swatch legend__swatch--traveled" /> Played-back samples
+            </li>
+            <li>
+              <span className="legend__swatch legend__swatch--path" /> Full recorded path
+            </li>
+            <li>
+              <span className="legend__swatch legend__swatch--marker" /> Test particle (recorded sample)
+            </li>
+            {modelAsset ? (
+              <li>
+                <span className="legend__swatch legend__swatch--spacecraft" /> GOES spacecraft mesh
+                (render only)
+              </li>
+            ) : null}
+          </ul>
+        </details>
         <p className="viewport__credit">
           <a
             data-testid="imagery-credit"
@@ -176,6 +218,28 @@ export function SimulationViewport({
           >
             Earth imagery: NASA Blue Marble
           </a>
+          {modelAsset ? (
+            <>
+              {' · '}
+              <a
+                data-testid="goes-model-credit"
+                href={GOES16_MODEL.sourcePageUrl}
+                target="_blank"
+                rel="noreferrer"
+                title={GOES16_MODEL.creditDetail}
+              >
+                GOES spacecraft 3D model: NASA
+              </a>
+              {' · '}
+              <a
+                href={GOES16_MODEL.usageUrl}
+                target="_blank"
+                rel="noreferrer"
+              >
+                usage
+              </a>
+            </>
+          ) : null}
         </p>
       </div>
 

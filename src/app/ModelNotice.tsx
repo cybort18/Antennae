@@ -10,6 +10,7 @@ import { Panel } from '../components/ui';
 import type { ReferencePreset } from '../data/types';
 import { formatNumber } from '../results/format';
 import { DISPLAY_SCALE_NOTE } from '../scene/displayScale';
+import { GOES16_MODEL, GOES16_REFERENCE_TARGET_ID } from '../scene/spacecraftModels';
 import type { SimulationResult } from '../simulation';
 
 export type ModelNoticeProps = {
@@ -29,6 +30,7 @@ export function ModelNotice({
   derivedFrom = null,
 }: ModelNoticeProps) {
   const source = reference ?? derivedFrom;
+  const goesModel = source?.provenance.targetId === GOES16_REFERENCE_TARGET_ID;
   return (
     <Panel title="Model & limitations" subtitle="Read before interpreting any number">
       <p className="note">
@@ -105,6 +107,28 @@ export function ModelNotice({
             </>
           )}
         </dd>
+
+        {goesModel ? (
+          <>
+            <dt>GOES spacecraft mesh</dt>
+            <dd>
+              This GOES-16 reference-derived run displays a local NASA GOES spacecraft glTF mesh as
+              a <strong>render-only</strong> marker at the recorded sample. It adds no mass,
+              attitude, thrust, fuel, or dynamics and does not change the simulated trajectory.
+              Source:{' '}
+              <a href={GOES16_MODEL.sourcePageUrl} target="_blank" rel="noreferrer">
+                NASA GOES Spacecraft 3D Model
+              </a>
+              , {GOES16_MODEL.format}, {GOES16_MODEL.bytes.toLocaleString('en-US')} bytes, retrieved{' '}
+              {GOES16_MODEL.retrievedAt}. {GOES16_MODEL.creditDetail} Usage:{' '}
+              <a href={GOES16_MODEL.usageUrl} target="_blank" rel="noreferrer">
+                NASA Images and Media Usage Guidelines
+              </a>
+              . The file is stored locally and served from this app; no runtime model request is
+              made.
+            </dd>
+          </>
+        ) : null}
 
         <dt>Playback</dt>
         <dd>
