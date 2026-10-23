@@ -57,6 +57,48 @@ export type SolarSystemRing = {
   opacity: number;
 };
 
+export type SolarSystemReferenceSourceId =
+  | 'jpl-phys-par'
+  | 'jpl-approx-pos'
+  | 'jpl-astro-par'
+  | 'nasa-nssdc-fact-sheet'
+  | 'nasa-sun-facts';
+
+export type SolarSystemReferenceSource = {
+  id: SolarSystemReferenceSourceId;
+  label: string;
+  url: string;
+  scopeNote: string;
+};
+
+/**
+ * Sourced physical reference facts for a Solar System body.
+ *
+ * These values are static educational reference facts only. They are never
+ * converted into scene units, never replace the display-only `orbitRadius`,
+ * `displayRadius`, or `phaseRadians` fields, and never feed the two-body
+ * simulation engine. For the central Sun, heliocentric orbital quantities are
+ * explicitly `null` (not applicable).
+ */
+export type SolarSystemPhysicalFacts = {
+  /** Volumetric mean radius in kilometres. */
+  meanRadiusKm: number;
+  /** Heliocentric semi-major axis in astronomical units; null for the Sun. */
+  semiMajorAxisAu: number | null;
+  /** Sidereal orbital period in Julian years (365.25 days); null for the Sun. */
+  siderealOrbitPeriodYears: number | null;
+  /** Sidereal orbital period in Earth days (siderealOrbitPeriodYears * 365.25); null for the Sun. */
+  siderealOrbitPeriodDays: number | null;
+  /** Dimensionless orbital eccentricity; null for the Sun. */
+  eccentricity: number | null;
+  /** Orbital inclination to the J2000 ecliptic in degrees; null for the Sun. */
+  inclinationDeg: number | null;
+  /** Provenance sources for the physical and orbital parameters above. */
+  sources: readonly SolarSystemReferenceSource[];
+  /** Optional field-level provenance or approximation note (e.g., Earth vs. EM Bary). */
+  provenanceNote?: string;
+};
+
 export type SolarSystemBody = {
   id: SolarSystemBodyId;
   name: string;
@@ -75,7 +117,50 @@ export type SolarSystemBody = {
   fallbackColor: string;
   texture?: SolarSystemTexture;
   ring?: SolarSystemRing;
+  /** Static physical reference facts with official NASA/JPL provenance. */
+  facts: SolarSystemPhysicalFacts;
   description: string;
+};
+
+/** Exact Julian year length in days from JPL Astrodynamic Parameters. */
+export const JULIAN_YEAR_DAYS = 365.25;
+
+export const SOLAR_SYSTEM_REFERENCE_SOURCES: Readonly<
+  Record<SolarSystemReferenceSourceId, SolarSystemReferenceSource>
+> = {
+  'jpl-phys-par': {
+    id: 'jpl-phys-par',
+    label: 'JPL Planetary Physical Parameters',
+    url: 'https://ssd.jpl.nasa.gov/planets/phys_par.html',
+    scopeNote:
+      'Volumetric mean radius (km) and sidereal orbital period (Julian years) for the eight planets.',
+  },
+  'jpl-approx-pos': {
+    id: 'jpl-approx-pos',
+    label: 'JPL Approximate Positions of the Planets',
+    url: 'https://ssd.jpl.nasa.gov/planets/approx_pos.html',
+    scopeNote:
+      'Table 1 J2000 mean-ecliptic Keplerian elements (a, e, I), valid 1800 AD–2050 AD (Table 1 lists the Earth-Moon barycenter rather than Earth alone).',
+  },
+  'jpl-astro-par': {
+    id: 'jpl-astro-par',
+    label: 'JPL Astrodynamic Parameters',
+    url: 'https://ssd.jpl.nasa.gov/astro_par.html',
+    scopeNote: 'Julian year definition (1 Julian year = 365.25 days) used for period conversion.',
+  },
+  'nasa-nssdc-fact-sheet': {
+    id: 'nasa-nssdc-fact-sheet',
+    label: 'NASA/NSSDC Planetary Fact Sheet',
+    url: 'https://nssdc.gsfc.nasa.gov/planetary/factsheet/',
+    scopeNote:
+      'Cross-checked planetary orbital facts and Earth J2000 mean orbital elements (used so Earth is not conflated with the Earth-Moon barycenter row in JPL Table 1).',
+  },
+  'nasa-sun-facts': {
+    id: 'nasa-sun-facts',
+    label: 'NASA Sun Facts',
+    url: 'https://science.nasa.gov/sun/facts/',
+    scopeNote: 'Approximate solar volumetric mean radius (~695,700 km; cross-referenced with NASA/NSSDC).',
+  },
 };
 
 export const SOLAR_SYSTEM_SCALE_NOTE =
@@ -85,7 +170,10 @@ export const SOLAR_SYSTEM_ORBIT_NOTE =
   'Orbit guides indicate order only. They are not fitted orbits or computed trajectories.';
 
 export const SOLAR_SYSTEM_MODE_NOTE =
-  'Static reference visualization. No planetary dynamics are computed in this view.';
+  'Reference visualization with opt-in period-proportional schematic motion. No planetary dynamics are computed in this view.';
+
+export const SOLAR_SYSTEM_SCHEMATIC_MOTION_NOTE =
+  'Illustrative schematic motion: angular speeds use sidereal orbital periods. Body sizes and orbit radii are compressed; positions do not represent a dated ephemeris.';
 
 const EARTH_BLUE_MARBLE: SolarSystemTexture = {
   localPath: '/assets/earth/blue-marble-2048.jpg',
@@ -178,6 +266,23 @@ export const NEW_PLANET_TEXTURE_BYTES = NEW_PLANET_TEXTURES.reduce(
   0,
 );
 
+const PLANET_JPL_SOURCES: readonly SolarSystemReferenceSource[] = [
+  SOLAR_SYSTEM_REFERENCE_SOURCES['jpl-phys-par'],
+  SOLAR_SYSTEM_REFERENCE_SOURCES['jpl-approx-pos'],
+  SOLAR_SYSTEM_REFERENCE_SOURCES['jpl-astro-par'],
+];
+
+const EARTH_SOURCES: readonly SolarSystemReferenceSource[] = [
+  SOLAR_SYSTEM_REFERENCE_SOURCES['jpl-phys-par'],
+  SOLAR_SYSTEM_REFERENCE_SOURCES['nasa-nssdc-fact-sheet'],
+  SOLAR_SYSTEM_REFERENCE_SOURCES['jpl-astro-par'],
+];
+
+const SUN_SOURCES: readonly SolarSystemReferenceSource[] = [
+  SOLAR_SYSTEM_REFERENCE_SOURCES['nasa-sun-facts'],
+  SOLAR_SYSTEM_REFERENCE_SOURCES['nasa-nssdc-fact-sheet'],
+];
+
 export const SOLAR_SYSTEM_BODIES: readonly SolarSystemBody[] = [
   {
     id: 'sun',
@@ -189,6 +294,17 @@ export const SOLAR_SYSTEM_BODIES: readonly SolarSystemBody[] = [
     phaseRadians: 0,
     accentColor: '#ffd38a',
     fallbackColor: '#f6b94d',
+    facts: {
+      meanRadiusKm: 695_700,
+      semiMajorAxisAu: null,
+      siderealOrbitPeriodYears: null,
+      siderealOrbitPeriodDays: null,
+      eccentricity: null,
+      inclinationDeg: null,
+      sources: SUN_SOURCES,
+      provenanceNote:
+        'Central body of the heliocentric reference view; heliocentric orbital elements do not apply.',
+    },
     description: 'The star at the centre of the Solar System.',
   },
   {
@@ -201,6 +317,15 @@ export const SOLAR_SYSTEM_BODIES: readonly SolarSystemBody[] = [
     phaseRadians: 0.58,
     accentColor: '#c2b19a',
     fallbackColor: '#8d8a82',
+    facts: {
+      meanRadiusKm: 2439.4,
+      semiMajorAxisAu: 0.38709927,
+      siderealOrbitPeriodYears: 0.2408467,
+      siderealOrbitPeriodDays: 0.2408467 * JULIAN_YEAR_DAYS,
+      eccentricity: 0.20563593,
+      inclinationDeg: 7.00497902,
+      sources: PLANET_JPL_SOURCES,
+    },
     description: 'The smallest planet and the closest to the Sun.',
   },
   {
@@ -214,6 +339,15 @@ export const SOLAR_SYSTEM_BODIES: readonly SolarSystemBody[] = [
     accentColor: '#e7bb78',
     fallbackColor: '#c89454',
     texture: VENUS_TEXTURE,
+    facts: {
+      meanRadiusKm: 6051.8,
+      semiMajorAxisAu: 0.72333566,
+      siderealOrbitPeriodYears: 0.61519726,
+      siderealOrbitPeriodDays: 0.61519726 * JULIAN_YEAR_DAYS,
+      eccentricity: 0.00677672,
+      inclinationDeg: 3.39467605,
+      sources: PLANET_JPL_SOURCES,
+    },
     description: 'A terrestrial planet with a dense atmosphere.',
   },
   {
@@ -227,6 +361,17 @@ export const SOLAR_SYSTEM_BODIES: readonly SolarSystemBody[] = [
     accentColor: '#6eb7df',
     fallbackColor: '#245c84',
     texture: EARTH_BLUE_MARBLE,
+    facts: {
+      meanRadiusKm: 6371.0084,
+      semiMajorAxisAu: 1.00000011,
+      siderealOrbitPeriodYears: 1.0000174,
+      siderealOrbitPeriodDays: 1.0000174 * JULIAN_YEAR_DAYS,
+      eccentricity: 0.01671022,
+      inclinationDeg: 0.00005,
+      sources: EARTH_SOURCES,
+      provenanceNote:
+        'Mean radius and sidereal period from JPL Planetary Physical Parameters; J2000 mean orbital elements (a, e, I) from NASA/NSSDC Earth Fact Sheet because JPL Approximate Positions Table 1 lists the Earth-Moon barycenter (EM Bary) rather than Earth alone.',
+    },
     description: 'Our home world and the body modelled by the Earth Orbit Lab.',
   },
   {
@@ -240,6 +385,15 @@ export const SOLAR_SYSTEM_BODIES: readonly SolarSystemBody[] = [
     accentColor: '#d47b55',
     fallbackColor: '#a95336',
     texture: MARS_TEXTURE,
+    facts: {
+      meanRadiusKm: 3389.5,
+      semiMajorAxisAu: 1.52371034,
+      siderealOrbitPeriodYears: 1.8808476,
+      siderealOrbitPeriodDays: 1.8808476 * JULIAN_YEAR_DAYS,
+      eccentricity: 0.0933941,
+      inclinationDeg: 1.84969142,
+      sources: PLANET_JPL_SOURCES,
+    },
     description: 'A terrestrial planet with a thin atmosphere.',
   },
   {
@@ -253,6 +407,15 @@ export const SOLAR_SYSTEM_BODIES: readonly SolarSystemBody[] = [
     accentColor: '#d8b291',
     fallbackColor: '#b58b68',
     texture: JUPITER_TEXTURE,
+    facts: {
+      meanRadiusKm: 69_911,
+      semiMajorAxisAu: 5.202887,
+      siderealOrbitPeriodYears: 11.862615,
+      siderealOrbitPeriodDays: 11.862615 * JULIAN_YEAR_DAYS,
+      eccentricity: 0.04838624,
+      inclinationDeg: 1.30439695,
+      sources: PLANET_JPL_SOURCES,
+    },
     description: 'The largest planet in the Solar System; a gas giant.',
   },
   {
@@ -272,6 +435,15 @@ export const SOLAR_SYSTEM_BODIES: readonly SolarSystemBody[] = [
       color: '#d2bf93',
       opacity: 0.42,
     },
+    facts: {
+      meanRadiusKm: 58_232,
+      semiMajorAxisAu: 9.53667594,
+      siderealOrbitPeriodYears: 29.447498,
+      siderealOrbitPeriodDays: 29.447498 * JULIAN_YEAR_DAYS,
+      eccentricity: 0.05386179,
+      inclinationDeg: 2.48599187,
+      sources: PLANET_JPL_SOURCES,
+    },
     description: 'A gas giant known for its extensive ring system.',
   },
   {
@@ -284,6 +456,15 @@ export const SOLAR_SYSTEM_BODIES: readonly SolarSystemBody[] = [
     phaseRadians: 2.72,
     accentColor: '#9ed8df',
     fallbackColor: '#8fc7d1',
+    facts: {
+      meanRadiusKm: 25_362,
+      semiMajorAxisAu: 19.18916464,
+      siderealOrbitPeriodYears: 84.016846,
+      siderealOrbitPeriodDays: 84.016846 * JULIAN_YEAR_DAYS,
+      eccentricity: 0.04725744,
+      inclinationDeg: 0.77263783,
+      sources: PLANET_JPL_SOURCES,
+    },
     description: 'An ice giant with a strongly tilted rotation axis.',
   },
   {
@@ -297,6 +478,15 @@ export const SOLAR_SYSTEM_BODIES: readonly SolarSystemBody[] = [
     accentColor: '#6d95e7',
     fallbackColor: '#3e68b6',
     texture: NEPTUNE_TEXTURE,
+    facts: {
+      meanRadiusKm: 24_622,
+      semiMajorAxisAu: 30.06992276,
+      siderealOrbitPeriodYears: 164.79132,
+      siderealOrbitPeriodDays: 164.79132 * JULIAN_YEAR_DAYS,
+      eccentricity: 0.00859048,
+      inclinationDeg: 1.77004347,
+      sources: PLANET_JPL_SOURCES,
+    },
     description: 'The outermost of the eight planets; an ice giant.',
   },
 ] as const;
@@ -337,6 +527,28 @@ export function bodyPosition(id: SolarSystemBodyId): [number, number, number] {
   ];
 }
 
+export function bodyPositionAtDays(
+  id: SolarSystemBodyId,
+  elapsedDays: number,
+): [number, number, number] {
+  const body = bodyById(id);
+  const periodDays = body.facts.siderealOrbitPeriodDays;
+  if (
+    body.orbitRadius === 0 ||
+    periodDays === null ||
+    !Number.isFinite(elapsedDays) ||
+    elapsedDays === 0
+  ) {
+    return bodyPosition(id);
+  }
+  const theta = body.phaseRadians + (2 * Math.PI * elapsedDays) / periodDays;
+  return [
+    Math.cos(theta) * body.orbitRadius,
+    0,
+    Math.sin(theta) * body.orbitRadius,
+  ];
+}
+
 export type CameraFocusMode = 'overview' | 'body';
 
 export type CameraPose = {
@@ -364,6 +576,7 @@ const FOCUS_DIRECTION: [number, number, number] = [0.37, 0.85, 0.37];
 export function cameraPose(
   focusMode: CameraFocusMode,
   selectedId: SolarSystemBodyId,
+  elapsedDays = 0,
 ): CameraPose {
   if (focusMode === 'overview') {
     return {
@@ -376,7 +589,7 @@ export function cameraPose(
   }
 
   const body = bodyById(selectedId);
-  const target = bodyPosition(selectedId);
+  const target = bodyPositionAtDays(selectedId, elapsedDays);
   const distance = 1.5 + body.displayRadius * 6.2;
   const length = Math.hypot(...FOCUS_DIRECTION);
   const direction: [number, number, number] = [

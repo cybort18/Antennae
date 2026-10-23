@@ -39,6 +39,64 @@ This file prevents an AI agent from turning a suggestion into an unreviewed requ
 
 Entries are append-only: supersede an older decision with a newer dated entry instead of rewriting history.
 
+### 2026-10-23 — Phase 5 Step 2: Solar System reference facts and illustrative schematic motion
+
+**Context.** The Solar System Overview (`src/solarSystem/`, `src/app/SolarSystemOverview.tsx`,
+`src/scene/SolarSystemViewport.tsx`) previously showed only qualitative labels and fixed static angles, with no
+quantitative planetary reference facts or relative orbital motion. The owner requested sourced physical reference
+facts for the Sun and eight planets plus an opt-in, period-proportional schematic motion control—while preserving
+the compressed schematic layout, keeping all Phase 5 Step 1 UI precision changes intact, and strictly avoiding
+ephemeris claims, heliocentric physics, runtime network calls, or new dependencies.
+
+**Choices made.**
+
+1. **Sourced physical reference facts stay separate from display geometry.** `src/solarSystem/bodies.ts` adds
+   `SolarSystemPhysicalFacts` (`meanRadiusKm`, `semiMajorAxisAu`, `siderealOrbitPeriodYears`,
+   `siderealOrbitPeriodDays`, `eccentricity`, `inclinationDeg`, `sources`, and optional `provenanceNote`) alongside
+   `SOLAR_SYSTEM_REFERENCE_SOURCES`. Display-only fields (`orbitRadius`, `displayRadius`, `phaseRadians`) remain
+   unchanged and are never replaced by physical AU or km values. For the central Sun, `meanRadiusKm` is `695,700 km`
+   (`https://science.nasa.gov/sun/facts/`) and all heliocentric orbital fields are `null` (rendered as
+   `Not applicable (central star)`).
+2. **Exact source attribution and Earth vs. EM Bary distinction.** Mean radii and sidereal orbital periods in
+   Julian years come from JPL Planetary Physical Parameters (`https://ssd.jpl.nasa.gov/planets/phys_par.html`) and
+   are converted to Earth days via the exact Julian year (`365.25 d`, `https://ssd.jpl.nasa.gov/astro_par.html`).
+   Approximate J2000 mean-ecliptic Keplerian elements (`a`, `e`, `I`, valid 1800–2050) come from JPL Approximate
+   Positions Table 1 (`https://ssd.jpl.nasa.gov/planets/approx_pos.html`) for Mercury, Venus, Mars, Jupiter,
+   Saturn, Uranus, and Neptune. Because JPL Table 1 lists the Earth-Moon barycenter (`EM Bary`) rather than Earth
+   alone, Earth uses the NASA/NSSDC Earth J2000 mean orbital elements (`a = 1.00000011 AU`, `e = 0.01671022`,
+   `I = 0.00005°`, `https://nssdc.gsfc.nasa.gov/planetary/factsheet/`) and states that distinction in its
+   `provenanceNote`.
+3. **Pure period-proportional circular schematic motion.** `src/solarSystem/schematicMotion.ts` computes
+   `theta_i(days) = phaseRadians_i + 2 * PI * elapsedDays / siderealOrbitPeriodDays_i` on each planet's existing
+   compressed `orbitRadius` in the `y = 0` plane, keeping the Sun at `[0, 0, 0]`. At `elapsedDays = 0`, every body
+   returns to its exact static `bodyPosition(id)` coordinates; advancing by one full sidereal period returns each
+   planet to its initial schematic position within `< 1e-9` scene units. Angular speeds are strictly inversely
+   proportional to sidereal orbital periods.
+4. **Opt-in motion strip and mode-switch lifecycle.** `SolarSystemOverview` adds a restrained bottom motion strip
+   (Reset to `0 d`, Play/Pause, `−10 d` / `+10 d` steps, `0–3,650` Earth-day scrubber representing `10 Julian years`,
+   `10 d/s`, `60 d/s`, and `365 d/s` playback rates, tabular-numeral readout, and persistent
+   `ILLUSTRATIVE MOTION · NOT AN EPHEMERIS` disclosure). Motion always initializes paused (including under
+   `prefers-reduced-motion: reduce`), stops automatically at `3,650 d`, and clamps animation frame deltas to
+   `0.25 s`. `App.tsx` holds `overviewElapsedDays` and `overviewRateDaysPerSec` so switching Overview → Lab/Mission
+   unmounts the Overview cleanly (pausing motion without keeping a hidden WebGL canvas mounted) and returning to
+   Overview restores the exact elapsed-day counter in a paused state. When a body is focused, `CameraFocus` and
+   `LabelProjector` track its moving schematic position. The physics engine (`src/simulation/`) is never called.
+
+**Alternatives considered.** Using `semiMajorAxisAu` for scene orbit radii (rejected: inner planets would collapse
+into the Sun at whole-system zoom); using JPL Table 1 `EM Bary` elements silently as Earth (rejected: violates data
+honesty); keeping the Overview WebGL canvas mounted while in Lab/Mission (rejected: wastes GPU resources when lifting
+two scalar state values in `App.tsx` suffices); adding a calendar date picker (rejected: would falsely imply a
+dated ephemeris).
+
+**Consequences and follow-ups.** The Overview now communicates both relative orbital periods and sourced planetary
+scale/elements while remaining explicitly a schematic reference view. Bennu and small-body exploration remain
+scoped for a subsequent step.
+
+**Tests added.** `src/solarSystem/__tests__/schematicMotion.test.ts` and expanded assertions in
+`src/solarSystem/__tests__/bodies.test.ts` and `src/app/__tests__/overviewView.test.tsx`.
+
+**Docs updated.** `README.md`, `PRD.md`, `docs/ARCHITECTURE.md`, `docs/DATA_SOURCES.md`, `docs/DECISIONS.md`.
+
 ### 2026-10-23 — Documentation system consolidation (Stage 2)
 
 **Context.** The repository accumulated twelve Markdown guides and private planning documents in `docs/` alongside

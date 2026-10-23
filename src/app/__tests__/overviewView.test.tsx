@@ -8,7 +8,7 @@
  * the Earth Orbit Lab where the two-body engine remains untouched.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 const engineProbe = vi.hoisted(() => ({ calls: 0, allow: false }));
@@ -48,16 +48,19 @@ vi.mock('../../scene/SolarSystemViewport', () => ({
     selectedId,
     focusMode,
     focusSignal,
+    elapsedDays,
   }: {
     selectedId: string;
     focusMode: string;
     focusSignal: number;
+    elapsedDays?: number;
   }) => (
     <div
       data-testid="solar-system-viewport-stub"
       data-selected-id={selectedId}
       data-focus-mode={focusMode}
       data-focus-signal={String(focusSignal)}
+      data-elapsed-days={String(elapsedDays ?? 0)}
     />
   ),
 }));
@@ -107,12 +110,24 @@ describe('Solar System Overview', () => {
     const viewport = screen.getByTestId('solar-system-viewport-stub');
     expect(viewport.dataset.selectedId).toBe('sun');
     expect(viewport.dataset.focusMode).toBe('overview');
+    expect(viewport.dataset.elapsedDays).toBe('0');
 
-    // The overview is explicitly not to scale and exposes no playback controls.
+    // The overview is explicitly not to scale, starts paused at 0.0 Earth days, and exposes no simulation sample playback controls.
     expect(screen.getAllByText(/not to scale/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/ILLUSTRATIVE MOTION · NOT AN EPHEMERIS/)).toBeTruthy();
+    expect(screen.getByTestId('schematic-elapsed-readout').textContent).toBe(
+      'Schematic elapsed time: +0.0 Earth days',
+    );
+    expect(
+      screen.getByRole('button', { name: 'Play schematic motion' }).getAttribute('aria-pressed'),
+    ).toBe('false');
     expect(screen.queryByRole('button', { name: /Run playback/ })).toBeNull();
     expect(screen.queryByRole('button', { name: /Step forward one sample/ })).toBeNull();
     expect(screen.queryByText('Two-body model')).toBeNull();
+
+    // Sun orbital fields are explicitly shown as not applicable rather than 0.
+    expect(screen.getByText('695,700 km')).toBeTruthy();
+    expect(screen.getAllByText(/Not applicable \(central star\)/)).toHaveLength(4);
   });
 
   it('selects a body, updates its reference details, and resets the camera', async () => {
@@ -127,13 +142,22 @@ describe('Solar System Overview', () => {
     expect(screen.getByRole('heading', { name: 'Jupiter' })).toBeTruthy();
     expect(screen.getByText('5 of 8 from the Sun')).toBeTruthy();
     expect(screen.getByText('Gas giant')).toBeTruthy();
+    expect(screen.getByText('69,911 km')).toBeTruthy();
+    expect(screen.getByText('5.2029 AU')).toBeTruthy();
+    expect(screen.getByText(/4332\.82 Earth days/)).toBeTruthy();
+    expect(screen.getByText('0.0484')).toBeTruthy();
+    expect(screen.getByText(/1\.30° \(J2000 ecliptic\)/)).toBeTruthy();
     expect(screen.getByText('NASA 3D Resources texture')).toBeTruthy();
     expect(screen.getAllByText(/fixed illustrative angle/i).length).toBeGreaterThan(0);
 
-    // Earth must be attributed to the Earth Observatory, not NASA 3D Resources.
+    // Earth must be attributed to the Earth Observatory, not NASA 3D Resources, and disclose its NSSDC vs. EM Bary provenance.
     const bodySelector = within(screen.getByLabelText('Solar System bodies'));
     await user.click(bodySelector.getByRole('button', { name: /^Earth/ }));
     expect(screen.getByText('NASA Earth Observatory texture')).toBeTruthy();
+    expect(screen.getByText('6371.0 km')).toBeTruthy();
+    expect(screen.getByText('1.0000 AU')).toBeTruthy();
+    expect(screen.getByText(/365\.26 Earth days/)).toBeTruthy();
+    expect(screen.getByText(/Earth-Moon barycenter/i)).toBeTruthy();
 
     // Radar-derived and illustrative surfaces are not presented as natural
     // colour or observational maps.
@@ -146,6 +170,70 @@ describe('Solar System Overview', () => {
     await user.click(screen.getByRole('button', { name: 'Overview view' }));
     expect(viewport.dataset.selectedId).toBe('neptune');
     expect(viewport.dataset.focusMode).toBe('overview');
+  });
+
+  it('controls schematic motion deterministically, honors reduced motion, and preserves elapsed days across mode switches without running the physics engine', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    const viewport = () => screen.getByTestId('solar-system-viewport-stub');
+    const readout = () => screen.getByTestId('schematic-elapsed-readout');
+
+    // Step forward +10 d twice, step back -10 d once
+    await user.click(screen.getByRole('button', { name: 'Step forward 10 Earth days' }));
+    expect(readout().textContent).toBe('Schematic elapsed time: +10.0 Earth days');
+    expect(viewport().dataset.elapsedDays).toBe('10');
+
+    await user.click(screen.getByRole('button', { name: 'Step forward 10 Earth days' }));
+    expect(readout().textContent).toBe('Schematic elapsed time: +20.0 Earth days');
+
+    await user.click(screen.getByRole('button', { name: 'Step back 10 Earth days' }));
+    expect(readout().textContent).toBe('Schematic elapsed time: +10.0 Earth days');
+
+    // Scrub to 120 Earth days and verify rate selector buttons
+    const scrubber = screen.getByRole('slider', { name: 'Schematic elapsed time (Earth days)' });
+    fireEvent.change(scrubber, { target: { value: '120' } });
+    expect(readout().textContent).toBe('Schematic elapsed time: +120.0 Earth days');
+    expect(viewport().dataset.elapsedDays).toBe('120');
+
+    await user.click(screen.getByRole('button', { name: '10 d/s' }));
+    expect(screen.getByRole('button', { name: '10 d/s' }).getAttribute('aria-pressed')).toBe('true');
+    await user.click(screen.getByRole('button', { name: '365 d/s' }));
+    expect(screen.getByRole('button', { name: '365 d/s' }).getAttribute('aria-pressed')).toBe('true');
+
+    // Play schematic motion, then switch to Earth Orbit Lab and back
+    await user.click(screen.getByRole('button', { name: 'Play schematic motion' }));
+    expect(screen.getByRole('button', { name: 'Pause schematic motion' }).getAttribute('aria-pressed')).toBe('true');
+
+    // Physics engine has still never been called during Overview motion/scrubbing/stepping
+    expect(engineProbe.calls).toBe(0);
+
+    // Switch to Lab -> pauses schematic motion; returning to Overview preserves elapsed days and starts paused
+    engineProbe.allow = true;
+    await user.click(screen.getByRole('button', { name: 'Earth Orbit Lab' }));
+    expect(screen.getByText('Two-body model')).toBeTruthy();
+
+    await user.click(screen.getByRole('button', { name: 'Solar System' }));
+    expect(
+      screen.getByRole('button', { name: 'Play schematic motion' }).getAttribute('aria-pressed'),
+    ).toBe('false');
+    expect(readout().textContent).toMatch(/^\Schematic elapsed time: \+12\d\.\d Earth days$/);
+
+    // Scrub to upper bound (3650) and verify +10 d is disabled and Play does not advance past 3650
+    const returnedScrubber = screen.getByRole('slider', {
+      name: 'Schematic elapsed time (Earth days)',
+    });
+    fireEvent.change(returnedScrubber, { target: { value: '3650' } });
+    expect(readout().textContent).toBe('Schematic elapsed time: +3650.0 Earth days');
+    expect(
+      (screen.getByRole('button', { name: 'Step forward 10 Earth days' }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(true);
+
+    // Reset returns to 0.0 Earth days
+    await user.click(screen.getByRole('button', { name: 'Reset schematic motion' }));
+    expect(readout().textContent).toBe('Schematic elapsed time: +0.0 Earth days');
+    expect(viewport().dataset.elapsedDays).toBe('0');
   });
 
   it('switches to the laboratory and back without discarding comparison records', async () => {

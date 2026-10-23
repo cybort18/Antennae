@@ -65,13 +65,13 @@ The application provides three distinct operational surfaces accessible via top-
 
 ### 3.1 Solar System Overview (Orientation & Reference Surface)
 - **Role:** Default landing view that establishes cosmic scale and context before entering orbital simulation.
-- **Scope & Limitations:** A static, schematic 3D visualization of the Sun and eight planets. It is **not** an ephemeris, dynamic simulation, or N-body model. Sizes, distances, and orbit spacings are compressed for legibility.
+- **Scope & Limitations:** A schematic 3D visualization of the Sun and eight planets with sourced NASA/JPL physical reference facts and an opt-in, period-proportional schematic motion control. It is **not** a dated ephemeris, dynamic simulation, or N-body model. Sizes, distances, and orbit spacings are compressed for legibility.
 - **User Flow:**
-  1. User lands on the Overview; inspects the Sun and eight planets.
+  1. User lands on the Overview; inspects the Sun and eight planets (motion starts paused at `+0.0 Earth days`).
   2. Selects any body via clickable canvas labels or the body drawer list.
-  3. Inspects physical reference facts (mean radius, orbital period, semi-major axis) and local NASA texture attribution.
-  4. Focuses camera on the selected body or resets to system view.
-  5. Switches reversibly to Earth Orbit Lab or Mission Designer without losing in-memory records.
+  3. Inspects physical reference facts (volumetric mean radius, semi-major axis, sidereal orbital period in Earth days and Julian years, eccentricity, inclination) with official NASA/JPL provenance links and local NASA texture attribution.
+  4. Focuses camera on the selected body, steps/scrubs/plays illustrative schematic motion (0–3,650 Earth days at 10, 60, or 365 d/s), or resets to system view.
+  5. Switches reversibly to Earth Orbit Lab or Mission Designer (automatically pausing schematic motion while preserving elapsed schematic days and in-memory simulation records).
 
 ### 3.2 Earth Orbit Lab (Open Physics Sandbox)
 - **Role:** Interactive laboratory for two-body orbital mechanics around Earth.

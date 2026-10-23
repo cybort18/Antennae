@@ -11,19 +11,23 @@ provenance and runs it as a clearly labelled hypothetical two-body initial condi
 render-only NASA GOES spacecraft mesh marks that reference when it is displayed.
 
 It is a learning and demonstration tool. It is **not** flight software, a navigation tool, or an
-impact-prediction service. The Overview is a static reference visualization, not a planetary dynamics
-model or an ephemeris.
+impact-prediction service. The Overview is a schematic reference visualization with opt-in,
+period-proportional illustrative motion, not a planetary dynamics model or a dated ephemeris.
 
 ## What works today
 
 - **Solar System Overview** (`src/solarSystem/`, `src/scene/SolarSystemViewport.tsx`): the default landing
-  mode. It shows the Sun and eight planets in a fixed, schematic layout with a body list, projected DOM
-  labels, selectable bodies, camera focus and a whole-system reset. Four non-Earth textures (Mars, Jupiter,
+  mode. It shows the Sun and eight planets in a compressed schematic layout with a body list, projected DOM
+  labels, selectable bodies, sourced physical reference facts (volumetric mean radius, semi-major axis,
+  sidereal orbital period in Earth days and Julian years, eccentricity, and inclination with official
+  NASA/JPL source links), camera focus, a whole-system reset, and an opt-in **Illustrative Schematic Motion**
+  control strip (Reset, Play/Pause, ±10 Earth-day steps, 0–3,650 Earth-day scrubber, and 10 / 60 / 365 d/s
+  rates). Four non-Earth textures (Mars, Jupiter,
   Venus, Neptune) are served locally from NASA 3D Resources; the Sun, Mercury, Saturn, and Uranus use
   procedural display materials, and Saturn's rings are procedural geometry. The screen states that sizes,
   distances, and positions are compressed and illustrative, and it computes no planetary dynamics. Switching
-  among the Overview, Earth Orbit Lab, and Mission Designer is reversible; it does not clear the shared baseline,
-  candidate, draft, or playback records.
+  among the Overview, Earth Orbit Lab, and Mission Designer is reversible; it pauses schematic motion while
+  preserving elapsed schematic days and does not clear the shared baseline, candidate, draft, or playback records.
 - **Deterministic two-body physics core** (`src/simulation/`), framework-independent TypeScript: point-mass
   gravity, fixed-step kick-drift-kick leapfrog integration, input validation, stop conditions, warnings, and
   byte-identical output for identical input.
@@ -87,10 +91,13 @@ physical atmosphere model; the cloud layer does not rotate or update. The camera
 framing controls, and the comparison chart is a collapsible analysis drawer over the scene.
 
 The Solar System Overview is a **separate schematic reference view**. Its orbit guides indicate order
-only; body sizes, orbit spacing, and fixed phase angles are display composition values in scene units.
+only; body sizes, orbit spacing, and initial phase angles are display composition values in scene units.
 They are not physical radii, distances, orbital elements, dates, or current positions, and they are never
-passed into the Earth Orbit Lab, Mission Designer, or physics engine. It has no simulated time, weather,
-telemetry, or planetary motion. Focusing a body changes the camera only.
+passed into the Earth Orbit Lab, Mission Designer, or physics engine. Its opt-in schematic motion advances
+planets along their compressed circular guides at angular rates inversely proportional to their sidereal
+orbital periods (`theta_i(days) = phaseRadians_i + 2*pi * elapsedDays / siderealOrbitPeriodDays_i`); it is
+not a computed ephemeris or heliocentric dynamics model, and it has no weather or telemetry. Focusing a
+body changes the camera only and tracks that body's schematic display position.
 
 The starting preset is an explicit synthetic idealisation, **not** NASA/JPL observational data. A second,
 opt-in preset is a cached JPL Horizons state vector for GOES-16. Its initial vector is source data, but the
@@ -202,7 +209,8 @@ docs/           # Technical documentation (see below)
   lazily loaded, render-only GOES GLB plus the six local textures described above and their fallbacks.
 - Persistence, accounts, sharing, and deployment configuration.
 - Additional force models (N-body, thrust, drag) and any multi-body or spacecraft dynamics. The Solar
-  System Overview is static; it does not model planetary motion or N-body gravity.
+  System Overview uses period-proportional schematic circular motion only; it does not model heliocentric
+  planetary dynamics, N-body gravity, or a dated ephemeris.
 
 ## Verification
 

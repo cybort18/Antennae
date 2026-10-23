@@ -18,12 +18,12 @@ import { AdditiveBlending, DoubleSide, Vector3 } from 'three';
 import {
   SOLAR_SYSTEM_BODIES,
   bodyById,
-  bodyPosition,
   cameraPose,
   type CameraFocusMode,
   type SolarSystemBody,
   type SolarSystemBodyId,
 } from '../solarSystem/bodies';
+import { schematicBodyPosition } from '../solarSystem/schematicMotion';
 import { Starfield } from './Starfield';
 import { planetSurfaceState } from './planetSurface';
 import { useLocalTexture } from './useLocalTexture';
@@ -34,10 +34,12 @@ function CameraFocus({
   focusMode,
   selectedId,
   focusSignal,
+  elapsedDays,
 }: {
   focusMode: CameraFocusMode;
   selectedId: SolarSystemBodyId;
   focusSignal: number;
+  elapsedDays: number;
 }) {
   const camera = useThree((state) => state.camera);
   const size = useThree((state) => state.size);
@@ -45,8 +47,18 @@ function CameraFocus({
     | { target: { set: (x: number, y: number, z: number) => void }; update: () => void }
     | null;
 
+  const elapsedDaysRef = useRef(elapsedDays);
   useEffect(() => {
-    const pose = cameraPose(focusMode, selectedId);
+    elapsedDaysRef.current = elapsedDays;
+  }, [elapsedDays]);
+
+  const lastTargetRef = useRef<[number, number, number]>(
+    cameraPose(focusMode, selectedId, elapsedDays).target,
+  );
+
+  // Explicit camera snap when selection, focusMode, focusSignal, or viewport size changes.
+  useEffect(() => {
+    const pose = cameraPose(focusMode, selectedId, elapsedDaysRef.current);
     // Narrow canvases have a smaller horizontal field of view. Pull the
     // overview camera back a little so the outer orbit guides and labels stay
     // inside the frame; this is framing only.
@@ -59,11 +71,41 @@ function CameraFocus({
       pose.position[2] * overviewScale,
     );
     camera.lookAt(...pose.target);
+    lastTargetRef.current = [...pose.target];
     if (controls) {
       controls.target.set(...pose.target);
       controls.update();
     }
   }, [camera, controls, focusMode, focusSignal, selectedId, size.height, size.width]);
+
+  // When a planet is focused and schematic time changes, translate the camera and
+  // OrbitControls target by the body's schematic displacement so the camera
+  // follows the moving body while preserving user orbit/zoom adjustments.
+  useEffect(() => {
+    if (focusMode !== 'body') {
+      return;
+    }
+    const nextTarget = cameraPose('body', selectedId, elapsedDays).target;
+    const [prevX, prevY, prevZ] = lastTargetRef.current;
+    const dx = nextTarget[0] - prevX;
+    const dy = nextTarget[1] - prevY;
+    const dz = nextTarget[2] - prevZ;
+    if (Math.hypot(dx, dy, dz) < 1e-12) {
+      return;
+    }
+    lastTargetRef.current = [...nextTarget];
+    camera.position.set(
+      camera.position.x + dx,
+      camera.position.y + dy,
+      camera.position.z + dz,
+    );
+    if (controls) {
+      controls.target.set(...nextTarget);
+      controls.update();
+    } else {
+      camera.lookAt(...nextTarget);
+    }
+  }, [camera, controls, elapsedDays, focusMode, selectedId]);
 
   return null;
 }
@@ -110,14 +152,20 @@ type LabelPositionUpdater = (
 
 type LabelRefMap = Partial<Record<SolarSystemBodyId, HTMLButtonElement | null>>;
 
-function LabelProjector({ onUpdate }: { onUpdate: LabelPositionUpdater }) {
+function LabelProjector({
+  elapsedDays,
+  onUpdate,
+}: {
+  elapsedDays: number;
+  onUpdate: LabelPositionUpdater;
+}) {
   const camera = useThree((state) => state.camera);
   const size = useThree((state) => state.size);
   const point = useMemo(() => new Vector3(), []);
 
   useFrame(() => {
     for (const body of SOLAR_SYSTEM_BODIES) {
-      const [x, , z] = bodyPosition(body.id);
+      const [x, , z] = schematicBodyPosition(body.id, elapsedDays);
       const labelHeight = body.displayRadius + (body.id === 'sun' ? 1.9 : 0.68);
       point.set(x, labelHeight, z).project(camera);
 
@@ -140,7 +188,13 @@ function LabelProjector({ onUpdate }: { onUpdate: LabelPositionUpdater }) {
   return null;
 }
 
-function SaturnRing({ body }: { body: SolarSystemBody }) {
+function SaturnRing({
+  body,
+  position,
+}: {
+  body: SolarSystemBody;
+  position: [number, number, number];
+}) {
   const ring = body.ring;
   if (!ring) {
     return null;
@@ -160,7 +214,7 @@ function SaturnRing({ body }: { body: SolarSystemBody }) {
           key={`${body.id}-ring-${index}`}
           name={`${body.id}-rings-${index}`}
           rotation={[-Math.PI / 2, 0, 0]}
-          position={bodyPosition(body.id)}
+          position={position}
           renderOrder={1}
         >
           <ringGeometry args={[body.displayRadius * inner, body.displayRadius * outer, 96]} />
@@ -179,15 +233,17 @@ function SaturnRing({ body }: { body: SolarSystemBody }) {
 
 function PlanetBody({
   body,
+  elapsedDays,
   selected,
   onSelect,
 }: {
   body: SolarSystemBody;
+  elapsedDays: number;
   selected: boolean;
   onSelect: (id: SolarSystemBodyId) => void;
 }) {
   const texture = useLocalTexture(body.texture?.localPath ?? null);
-  const position = bodyPosition(body.id);
+  const position = schematicBodyPosition(body.id, elapsedDays);
   const isGasGiant = body.kind === 'gas-giant' || body.kind === 'ice-giant';
   const surface = planetSurfaceState(texture, body.fallbackColor);
 
@@ -213,7 +269,7 @@ function PlanetBody({
         />
       </mesh>
 
-      {body.ring ? <SaturnRing body={body} /> : null}
+      {body.ring ? <SaturnRing body={body} position={position} /> : null}
 
       {selected ? (
         <mesh position={position} scale={1.22} renderOrder={0}>
@@ -291,6 +347,7 @@ export type SolarSystemViewportProps = {
   selectedId: SolarSystemBodyId;
   focusMode: CameraFocusMode;
   focusSignal: number;
+  elapsedDays?: number;
   onSelect: (id: SolarSystemBodyId) => void;
 };
 
@@ -298,9 +355,10 @@ export function SolarSystemViewport({
   selectedId,
   focusMode,
   focusSignal,
+  elapsedDays = 0,
   onSelect,
 }: SolarSystemViewportProps) {
-  const initialPose = cameraPose(focusMode, selectedId);
+  const initialPose = cameraPose(focusMode, selectedId, elapsedDays);
   const labelRefs = useRef<LabelRefMap>({});
 
   const updateLabel = useCallback<LabelPositionUpdater>((id, x, y, visible) => {
@@ -348,8 +406,9 @@ export function SolarSystemViewport({
           focusMode={focusMode}
           selectedId={selectedId}
           focusSignal={focusSignal}
+          elapsedDays={elapsedDays}
         />
-        <LabelProjector onUpdate={updateLabel} />
+        <LabelProjector elapsedDays={elapsedDays} onUpdate={updateLabel} />
 
         <Sun selected={selectedId === 'sun'} onSelect={onSelect} />
 
@@ -365,6 +424,7 @@ export function SolarSystemViewport({
           <PlanetBody
             key={body.id}
             body={body}
+            elapsedDays={elapsedDays}
             selected={body.id === selectedId}
             onSelect={onSelect}
           />
@@ -407,7 +467,11 @@ export function SolarSystemViewport({
 
       <div className="ss-viewport__overlay ss-viewport__overlay--top-left">
         <span className="ss-badge">REFERENCE VISUALIZATION</span>
-        <p className="ss-viewport__hint">Static schematic layout · no simulated time</p>
+        <p className="ss-viewport__hint">
+          {elapsedDays === 0
+            ? 'Static schematic layout · no ephemeris or dynamics'
+            : 'Illustrative schematic motion · not an ephemeris'}
+        </p>
       </div>
 
       <div className="ss-viewport__overlay ss-viewport__overlay--top-right">

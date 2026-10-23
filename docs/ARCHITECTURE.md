@@ -102,54 +102,100 @@ docs/              # Canonical technical documentation
 Active contracts enforce strict separation between simulation state, reference data, and UI presentation:
 
 ```ts
-// From src/simulation/types.ts:
-export interface Vec3 {
+// From src/simulation/vector3.ts and src/simulation/types.ts:
+export type Vec3 = {
   x: number;
   y: number;
   z: number;
-}
+};
 
-export interface StateVector {
+export type StateVector = {
   positionKm: Vec3;
-  velocityKmS: Vec3;
-}
+  velocityKmPerS: Vec3;
+};
 
-export interface SimulationConfig {
-  initialState: StateVector;
+export type SimulationConfig = {
+  label?: string;
   centralBody: CentralBody;
+  initialState: StateVector;
+  timestepSeconds: number;
+  durationSeconds: number;
+  sampleIntervalSeconds?: number;
+  impactRadiusKm?: number;
+  maxSteps?: number;
+};
+
+export type SimulationSample = {
+  timeSeconds: number;
+  state: StateVector;
+};
+
+export type SimulationResult = {
+  label?: string;
+  model: SimulationModelId;
+  integrator: IntegratorId;
+  units: UnitSystem;
+  frame: ReferenceFrame;
+  centralBody: {
+    id: string;
+    name: string;
+    gravitationalParameterKm3PerS2: number;
+  };
   timestepSeconds: number;
   durationSeconds: number;
   sampleIntervalSeconds: number;
-  stopConditions?: StopConditionConfig;
-}
-
-export interface SimulationResult {
-  samples: StateVector[];
-  timesSeconds: number[];
   completedDurationSeconds: number;
-  status: SimulationRunStatus;
+  status: SimulationStatus;
+  stopReason?: SimulationWarningCode;
   warnings: SimulationWarning[];
-}
+  samples: SimulationSample[];
+  diagnostics: {
+    steps: number;
+    accelerationEvaluations: number;
+    initialSpecificOrbitalEnergyKm2PerS2: number;
+    finalSpecificOrbitalEnergyKm2PerS2: number;
+    maxRelativeEnergyDeviation: number;
+  };
+};
 
 // From src/comparison/records.ts:
-export interface ScenarioRecord {
-  role: "baseline" | "candidate";
+export type ScenarioRecord = {
+  role: 'baseline' | 'candidate';
   inputs: ScenarioInputs;
   config: SimulationConfig;
   result: SimulationResult;
-}
+};
 
 // From src/missions/circularOrbitMission.ts:
-export interface CircularOrbitMissionResult {
-  status: "PASS" | "FAIL" | "NOT EVALUABLE";
+export type MissionCriterion = {
+  id: 'coverage' | 'altitude-window' | 'clearance';
+  label: string;
+  status: 'pass' | 'fail' | 'not-evaluable';
+  detail: string;
+};
+
+export type MissionEvaluation = {
+  status: 'pass' | 'fail' | 'not-evaluable';
   reason: string;
   targetAltitudeKm: number;
-  criteria: {
-    periodCoverage: MissionCriterion;
-    altitudeTolerance: MissionCriterion;
-    groundClearance: MissionCriterion;
-  };
-}
+  targetToleranceKm: number;
+  minClearanceKm: number;
+  targetRadiusKm: number | null;
+  targetPeriodSeconds: number | null;
+  targetCircularSpeedKmPerS: number | null;
+  requiredDurationSeconds: number | null;
+  evaluatedDurationSeconds: number | null;
+  requestedDurationSeconds: number | null;
+  recordedSampleCount: number;
+  usableSampleCount: number;
+  minAltitudeKm: number | null;
+  maxAltitudeKm: number | null;
+  altitudeSpanKm: number | null;
+  runStatus: SimulationStatus | null;
+  warningCount: number;
+  warningCodes: SimulationWarningCode[];
+  criteria: MissionCriterion[];
+};
 ```
 
 ## 6. Versioning and state integrity
@@ -227,9 +273,10 @@ scripts `dev`, `build`, `typecheck`, `lint`, `test`, `test:watch`, `preview`.
 | `app/ModeTabs.tsx` | Three-surface switch: Solar System Overview / Earth Orbit Lab / Mission Designer |
 | `app/MissionDesignerPanel.tsx` | Task-first target/initial-condition controls, Run Mission action, outcome, criteria, sample-derived metrics, disclosures |
 | `missions/circularOrbitMission.ts` | Circular-speed/period formulas, target validation, recorded-sample evaluation, and NOT EVALUABLE rules |
-| `app/SolarSystemOverview.tsx` | Default reference screen: body selector, selected-body facts, camera reset, scale/source disclosures |
-| `solarSystem/bodies.ts` | Display-only Sun + eight-planet registry, schematic positions, camera poses, and local texture metadata |
-| `scene/SolarSystemViewport.tsx` | Static Overview canvas, procedural orbit guides, DOM labels, selection/focus camera, texture fallbacks, credit overlay |
+| `app/SolarSystemOverview.tsx` | Default reference screen: body selector, selected-body physical facts & provenance, opt-in schematic motion strip, camera reset, scale/source disclosures |
+| `solarSystem/bodies.ts` | Display-only Sun + eight-planet registry, sourced physical reference facts (`SolarSystemPhysicalFacts`), schematic positions, camera poses, and local texture metadata |
+| `solarSystem/schematicMotion.ts` | Pure, period-proportional schematic motion helpers (`theta_i(days) = phaseRadians_i + 2*pi * elapsedDays / siderealOrbitPeriodDays_i`) and deterministic day stepping/clamping |
+| `scene/SolarSystemViewport.tsx` | Overview canvas, procedural orbit guides, DOM labels, selection/focus camera tracking schematic positions, texture fallbacks, credit overlay |
 | `scene/useLocalTexture.ts`, `scene/planetSurface.ts` | Shared local-texture loading/disposal and texture-or-fallback material state |
 | `scene/spacecraftModels.ts`, `scene/GoesSpacecraftModel.tsx` | GOES-16 asset metadata/provenance and lazy, render-only GLB loading with marker fallback |
 | `app/*.tsx` | Top bar (with record switcher), object browser, inspector, results, timeline, notices, status banners |
@@ -282,29 +329,34 @@ substitute.
 ### Solar System Overview semantics
 
 The Overview is the default screen and a deliberately separate presentation surface. `src/solarSystem/bodies.ts`
-owns a static registry of the Sun and eight planets: display radii, compressed orbit radii, fixed composition
-angles, accent/fallback colours, optional local texture metadata, and camera poses. These are scene-composition
-values, not physical radii, distances, orbital elements, or epochs. The module imports no simulation, scenario,
-comparison, or result code, computes no dynamics, and has no clock or simulated time. Its positions are never
-converted to physical units or written into the Lab.
+owns a registry of the Sun and eight planets: display radii, compressed orbit radii, initial composition
+angles, accent/fallback colours, optional local texture metadata, camera poses, and sourced physical reference
+facts (`meanRadiusKm`, `semiMajorAxisAu`, `siderealOrbitPeriodYears`, `siderealOrbitPeriodDays`, `eccentricity`,
+`inclinationDeg`, and source URLs; orbital fields are `null` for the central Sun). The display geometry (`orbitRadius`,
+`displayRadius`, `phaseRadians`) remains strictly separated from the physical facts. `src/solarSystem/schematicMotion.ts`
+derives period-proportional illustrative positions along each planet's compressed circular guide from elapsed
+schematic Earth days (`theta_i(days) = phaseRadians_i + 2*PI * elapsedDays / siderealOrbitPeriodDays_i`), keeping
+the Sun fixed at `[0, 0, 0]`. Neither module imports simulation, scenario, comparison, or result code, computes
+planetary dynamics, or feeds positions into the Earth Orbit Lab.
 
 `src/scene/SolarSystemViewport.tsx` renders that registry with procedural orbit guides, textured spheres, a
 procedural Saturn ring, a deterministic star field, and DOM labels projected from the camera each frame. Body
-selection and **Overview view** change camera framing and the details panel only. The four planetary textures are
+selection, **Overview view**, and schematic motion update camera framing and the details panel only; when a body is
+focused, the camera tracks its schematic displacement. The four planetary textures are
 loaded from local paths through `useLocalTexture`; a load failure falls back to the registry's procedural colour.
 All source pages, credits, dimensions, and byte sizes stay in the registry and are surfaced by the disclosure and
 the public README.
 
-Mode switching is reversible. `App.tsx` keeps the comparison state outside all three surfaces and creates the
-initial baseline only on the first switch to the Lab or Mission Designer, so simply loading the app does not
-execute the engine. Switching among the three surfaces does not clear the baseline, candidate, draft, selected
-body, playback cursor, or records; every mode switch pauses playback so it does not advance while hidden. The
-switch moves focus to the destination heading or main lab region. The Overview itself has no playback,
-parameter, or run controls.
+Mode switching is reversible. `App.tsx` keeps the comparison state and the Overview's elapsed schematic days outside
+all three surfaces and creates the initial baseline only on the first switch to the Lab or Mission Designer, so
+simply loading the app does not execute the engine. Switching among the three surfaces does not clear the baseline,
+candidate, draft, selected body, Overview elapsed schematic days, playback cursor, or records; every mode switch
+pauses active playback (both Lab/Mission sample playback and Overview schematic motion) so nothing advances while
+hidden, and no hidden WebGL canvas is kept mounted. The switch moves focus to the destination heading or main lab region.
 
 Limitations are explicit in the UI: orbit guides indicate order only, sizes and spacing are compressed, positions
-are illustrative rather than an ephemeris, and no planetary dynamics or N-body model exists. The Overview does not
-represent moons, rings beyond Saturn's schematic ring, live data, weather, telemetry, or dates.
+and schematic motion are illustrative rather than a dated ephemeris, and no planetary dynamics or N-body model exists.
+The Overview does not represent moons, rings beyond Saturn's schematic ring, live data, weather, telemetry, or calendar dates.
 
 ### Mission evaluation semantics
 

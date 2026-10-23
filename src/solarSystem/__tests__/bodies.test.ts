@@ -1,14 +1,18 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  JULIAN_YEAR_DAYS,
   NEW_PLANET_TEXTURES,
   NEW_PLANET_TEXTURE_BYTES,
   SOLAR_SYSTEM_BODIES,
   SOLAR_SYSTEM_MODE_NOTE,
   SOLAR_SYSTEM_ORBIT_NOTE,
+  SOLAR_SYSTEM_REFERENCE_SOURCES,
   SOLAR_SYSTEM_SCALE_NOTE,
+  SOLAR_SYSTEM_SCHEMATIC_MOTION_NOTE,
   bodyById,
   bodyPosition,
+  bodyPositionAtDays,
   cameraPose,
 } from '../bodies';
 
@@ -77,10 +81,75 @@ describe('Solar System reference registry', () => {
     expect(SOLAR_SYSTEM_SCALE_NOTE).toMatch(/not an ephemeris/i);
     expect(SOLAR_SYSTEM_ORBIT_NOTE).toMatch(/not fitted orbits/i);
     expect(SOLAR_SYSTEM_MODE_NOTE).toMatch(/No planetary dynamics/i);
+    expect(SOLAR_SYSTEM_SCHEMATIC_MOTION_NOTE).toMatch(/angular speeds use sidereal orbital periods/i);
+    expect(SOLAR_SYSTEM_SCHEMATIC_MOTION_NOTE).toMatch(/do not represent a dated ephemeris/i);
+  });
+
+  it('includes sourced physical reference facts for the Sun and eight planets with null Sun orbital fields', () => {
+    expect(JULIAN_YEAR_DAYS).toBe(365.25);
+
+    const sun = bodyById('sun');
+    expect(sun.facts.meanRadiusKm).toBe(695700);
+    expect(sun.facts.semiMajorAxisAu).toBeNull();
+    expect(sun.facts.siderealOrbitPeriodYears).toBeNull();
+    expect(sun.facts.siderealOrbitPeriodDays).toBeNull();
+    expect(sun.facts.eccentricity).toBeNull();
+    expect(sun.facts.inclinationDeg).toBeNull();
+    expect(sun.facts.sources.map((s) => s.url)).toContain('https://science.nasa.gov/sun/facts/');
+
+    const expectedPeriodsYr: Record<string, number> = {
+      mercury: 0.2408467,
+      venus: 0.61519726,
+      earth: 1.0000174,
+      mars: 1.8808476,
+      jupiter: 11.862615,
+      saturn: 29.447498,
+      uranus: 84.016846,
+      neptune: 164.79132,
+    };
+
+    for (const body of SOLAR_SYSTEM_BODIES.filter((item) => item.id !== 'sun')) {
+      const { facts } = body;
+      expect(Number.isFinite(facts.meanRadiusKm)).toBe(true);
+      expect(facts.meanRadiusKm).toBeGreaterThan(2000);
+      expect(facts.meanRadiusKm).toBeLessThan(80000);
+
+      expect(facts.semiMajorAxisAu).not.toBeNull();
+      expect(Number.isFinite(facts.semiMajorAxisAu!)).toBe(true);
+      expect(facts.semiMajorAxisAu!).toBeGreaterThan(0.3);
+      expect(facts.semiMajorAxisAu!).toBeLessThan(35);
+
+      expect(facts.siderealOrbitPeriodYears).toBe(expectedPeriodsYr[body.id]);
+      expect(facts.siderealOrbitPeriodDays).toBeCloseTo(
+        expectedPeriodsYr[body.id] * JULIAN_YEAR_DAYS,
+        10,
+      );
+
+      expect(facts.eccentricity).not.toBeNull();
+      expect(facts.eccentricity!).toBeGreaterThan(0);
+      expect(facts.eccentricity!).toBeLessThan(0.25);
+
+      expect(facts.inclinationDeg).not.toBeNull();
+      expect(facts.inclinationDeg!).toBeGreaterThanOrEqual(0);
+      expect(facts.inclinationDeg!).toBeLessThan(10);
+
+      expect(facts.sources.length).toBeGreaterThanOrEqual(2);
+      for (const source of facts.sources) {
+        expect(source.url).toMatch(/^https:\/\/(ssd\.jpl\.nasa\.gov|nssdc\.gsfc\.nasa\.gov|science\.nasa\.gov)\//);
+      }
+    }
+
+    // Earth uses its own rounded NSSDC J2000 mean elements rather than silently claiming the JPL EM Bary row.
+    const earth = bodyById('earth');
+    expect(earth.facts.semiMajorAxisAu).toBe(1.00000011);
+    expect(earth.facts.eccentricity).toBe(0.01671022);
+    expect(earth.facts.provenanceNote).toMatch(/Earth-Moon barycenter/i);
+    expect(earth.facts.sources).toContain(SOLAR_SYSTEM_REFERENCE_SOURCES['nasa-nssdc-fact-sheet']);
   });
 
   it('places bodies on display-only schematic guides and focuses the camera without physics', () => {
     expect(bodyPosition('sun')).toEqual([0, 0, 0]);
+    expect(bodyPositionAtDays('sun', 250)).toEqual([0, 0, 0]);
 
     for (const body of SOLAR_SYSTEM_BODIES.filter((item) => item.id !== 'sun')) {
       const position = bodyPosition(body.id);
@@ -95,5 +164,8 @@ describe('Solar System reference registry', () => {
     expect(focused.target).toEqual(bodyPosition('jupiter'));
     expect(focused.position[1]).toBeGreaterThan(focused.target[1]);
     expect(focused.maxDistance).toBeGreaterThan(0);
+
+    const focusedAtDays = cameraPose('body', 'jupiter', 180);
+    expect(focusedAtDays.target).toEqual(bodyPositionAtDays('jupiter', 180));
   });
 });

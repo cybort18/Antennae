@@ -58,6 +58,10 @@ import {
 } from './simulation';
 import { SimulationViewport } from './scene/SimulationViewport';
 import { spacecraftModelForInputs } from './scene/spacecraftModels';
+import {
+  DEFAULT_SCHEMATIC_RATE,
+  type SchematicPlaybackRate,
+} from './solarSystem/schematicMotion';
 import type { SolarSystemBodyId } from './solarSystem/bodies';
 import {
   DEFAULT_SCENARIO_INPUTS,
@@ -80,6 +84,9 @@ export default function App() {
     MISSION_TARGET_ALTITUDE_DEFAULT_KM,
   );
   const [overviewSelection, setOverviewSelection] = useState<SolarSystemBodyId>('sun');
+  const [overviewElapsedDays, setOverviewElapsedDays] = useState(0);
+  const [overviewRateDaysPerSec, setOverviewRateDaysPerSec] =
+    useState<SchematicPlaybackRate>(DEFAULT_SCHEMATIC_RATE);
   const [selection, setSelection] = useState<Selection>('particle');
   const [view, setView] = useState<RecordRole>('baseline');
   const [sidebarLeftOpen, setSidebarLeftOpen] = useState(false);
@@ -305,6 +312,10 @@ export default function App() {
       <SolarSystemOverview
         selectedId={overviewSelection}
         onSelect={setOverviewSelection}
+        elapsedDays={overviewElapsedDays}
+        onChangeElapsedDays={setOverviewElapsedDays}
+        rateDaysPerSec={overviewRateDaysPerSec}
+        onChangeRateDaysPerSec={setOverviewRateDaysPerSec}
         onChangeMode={handleModeChange}
       />
     );

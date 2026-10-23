@@ -116,9 +116,9 @@ describe('Mission Designer', () => {
     expect(outcome().dataset.status).toBe('pass');
     expect(within(outcome()).getByText('PASS')).toBeTruthy();
     expect(within(outcome()).getByText(/Baseline reference/)).toBeTruthy();
-    expect(screen.getByText('Covers at least one target period')).toBeTruthy();
-    expect(screen.getByText('Stays inside the target-altitude window')).toBeTruthy();
-    expect(screen.getByText('Stays above the minimum clearance')).toBeTruthy();
+    expect(criterion('Covers at least one target period').classList.contains('mission-criterion--pass')).toBe(true);
+    expect(criterion('Stays inside the target-altitude window').classList.contains('mission-criterion--pass')).toBe(true);
+    expect(criterion('Stays above the minimum clearance').classList.contains('mission-criterion--pass')).toBe(true);
     expect(screen.getByText('Computed metrics')).toBeTruthy();
     expect(screen.getAllByText('Target period').length).toBeGreaterThan(0);
     expect(screen.getByText(/Altitude span is max/)).toBeTruthy();
@@ -149,6 +149,7 @@ describe('Mission Designer', () => {
     await runMission(user);
 
     expect(outcome().dataset.status).toBe('fail');
+    expect(criterion('Stays inside the target-altitude window').classList.contains('mission-criterion--fail')).toBe(true);
     expect(within(criterion('Stays inside the target-altitude window')).getByText('FAIL')).toBeTruthy();
     expect(screen.getAllByText(/Recorded altitude range/).length).toBeGreaterThan(0);
   }, 20000);
@@ -160,6 +161,7 @@ describe('Mission Designer', () => {
     await setNumber(user, /Initial speed/, '0.5');
     await runMission(user);
     expect(outcome().dataset.status).toBe('not-evaluable');
+    expect(criterion('Covers at least one target period').classList.contains('mission-criterion--not-evaluable')).toBe(true);
     expect(
       screen.getAllByText(/a completed run covering at least one target period is required/i).length,
     ).toBeGreaterThan(0);

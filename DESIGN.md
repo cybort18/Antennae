@@ -68,7 +68,7 @@ The V3 redesign establishes a clean, canvas-first interface where the 3D scene o
    - In **Mission Designer**: displays the task-first mission challenge card, PASS/FAIL outcome card, inputs, **Run Mission** action, criteria checklist, and compact metrics.
 4. **Bottom Analysis & Playback Zone:**  
    - **Collapsible Analysis Drawer:** Collapsed by default; expands upward via **Show chart** to reveal the dependency-free SVG altitude-versus-simulated-time chart and comparison summary metrics.
-   - **Playback Timeline:** Bounded strictly to recorded engine samples. Features Play/Pause, Step ±1 sample, Reset, sample-quantized scrubber, and time multiplier (10x, 50x, 100x, 500x, 1000x).
+   - **Playback Timeline:** Bounded strictly to recorded engine samples. Features Play/Pause, Step ±1 sample, Reset, sample-quantized scrubber, and time multiplier (10x, 60x, 300x, 1000x).
 
 ---
 

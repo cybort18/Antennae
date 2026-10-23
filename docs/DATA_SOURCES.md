@@ -48,6 +48,39 @@ These are candidates recorded in the project blueprint. Verify current docs, sch
 - **Known limitation:** ICRF is used directly as the model's Earth-centered inertial axes; the model has no
   epoch/time-scale or frame-rotation handling. The simulated trajectory is hypothetical.
 
+### 2b. Solar System Overview static reference facts (2026-10-23)
+
+`src/solarSystem/bodies.ts` includes static, educational physical reference facts (`SolarSystemPhysicalFacts`) for
+the Sun and eight planets. These values are displayed in the Overview's selected-body panel and provide the
+sidereal orbital periods used by the Overview's opt-in, period-proportional schematic motion
+(`src/solarSystem/schematicMotion.ts`). They make **no runtime network requests** and never feed the Earth-centered
+two-body simulation engine (`src/simulation/`).
+
+- **Sources and field provenance:**
+  1. **JPL Planetary Physical Parameters** (`https://ssd.jpl.nasa.gov/planets/phys_par.html`) — volumetric mean
+     radius (`meanRadiusKm`) and sidereal orbital period in Julian years (`siderealOrbitPeriodYears`) for Mercury
+     through Neptune:
+     - Mercury: `2439.4 km`, `0.2408467 yr` (`87.969257175 d`)
+     - Venus: `6051.8 km`, `0.61519726 yr` (`224.700799215 d`)
+     - Earth: `6371.0084 km`, `1.0000174 yr` (`365.25635535 d`)
+     - Mars: `3389.5 km`, `1.8808476 yr` (`686.9795859 d`)
+     - Jupiter: `69,911 km`, `11.862615 yr` (`4332.82012875 d`)
+     - Saturn: `58,232 km`, `29.447498 yr` (`10755.6986445 d`)
+     - Uranus: `25,362 km`, `84.016846 yr` (`30687.1529915 d`)
+     - Neptune: `24,622 km`, `164.79132 yr` (`60190.02963 d`)
+  2. **JPL Approximate Positions of the Planets** (`https://ssd.jpl.nasa.gov/planets/approx_pos.html`) — Table 1
+     J2000 mean-ecliptic Keplerian elements (`semiMajorAxisAu`, `eccentricity`, `inclinationDeg`), valid for
+     1800 AD–2050 AD, used for Mercury, Venus, Mars, Jupiter, Saturn, Uranus, and Neptune.
+  3. **NASA/NSSDC Planetary Fact Sheet — Earth** (`https://nssdc.gsfc.nasa.gov/planetary/factsheet/`) — used for
+     Earth's J2000 mean orbital elements (`semiMajorAxisAu = 1.00000011 AU`, `eccentricity = 0.01671022`,
+     `inclinationDeg = 0.00005°`) because JPL Approximate Positions Table 1 lists the Earth-Moon barycenter
+     (`EM Bary`) rather than Earth alone. This distinction is recorded explicitly in Earth's `provenanceNote`.
+  4. **NASA Sun Facts** (`https://science.nasa.gov/sun/facts/`) — approximate solar volumetric mean radius
+     (`meanRadiusKm = 695,700 km`, cross-referenced with NASA/NSSDC). Heliocentric orbital quantities for the
+     central Sun are explicitly `null` (displayed as `Not applicable (central star)`).
+  5. **JPL Astrodynamic Parameters** (`https://ssd.jpl.nasa.gov/astro_par.html`) — exact Julian year definition
+     (`1 Julian year = 365.25 Earth days`) used to compute `siderealOrbitPeriodDays = siderealOrbitPeriodYears * 365.25`.
+
 ## 3. Internal data contract
 
 Normalize provider payloads into an internal schema. Do not expose provider response shape throughout UI/components. The exact contract depends on the chosen model but typically records:

@@ -45,7 +45,7 @@
 .overview {
   height: 100%;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
   overflow: hidden;
   background: #02050a;
 }
@@ -387,7 +387,7 @@
 
 .ss-facts > div {
   display: grid;
-  grid-template-columns: 74px minmax(0, 1fr);
+  grid-template-columns: 88px minmax(0, 1fr);
   gap: 8px;
   align-items: baseline;
 }
@@ -399,6 +399,7 @@
 
 .ss-facts dd {
   color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
   font-size: 0.71rem;
   line-height: 1.4;
 }
@@ -410,6 +411,94 @@
 
 .ss-facts a:hover {
   text-decoration: underline;
+}
+
+.ss-facts__sources {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 4px;
+}
+
+/* ----------------------------------------------------- schematic motion */
+
+.ss-motion {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px 12px;
+  padding: 8px 16px 9px;
+  border-top: 1px solid rgba(133, 164, 194, 0.14);
+  background: rgba(4, 9, 15, 0.98);
+}
+
+.ss-motion__controls {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.ss-motion__track {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.ss-motion__scrubber {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.ss-motion__readout {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px 14px;
+  flex-wrap: wrap;
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.69rem;
+  color: var(--text-muted);
+}
+
+.ss-motion__rates {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.ss-motion__rate-label {
+  font-size: 0.69rem;
+  color: var(--text-dim);
+  margin-right: 2px;
+}
+
+.ss-motion__rates .button {
+  padding: 4px 6px;
+  font-size: 0.68rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.ss-motion__disclosure {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+}
+
+.ss-badge--motion {
+  border-color: rgba(123, 215, 232, 0.34);
+  background: rgba(8, 22, 31, 0.86);
+  color: #b9eaf1;
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+}
+
+.ss-motion__note {
+  margin: 0;
+  font-size: 0.67rem;
+  color: var(--text-dim);
+  line-height: 1.4;
 }
 
 .ss-actions {
@@ -529,7 +618,13 @@
   }
 
   .ss-facts > div {
-    grid-template-columns: 82px minmax(0, 1fr);
+    grid-template-columns: 92px minmax(0, 1fr);
+  }
+
+  .ss-motion {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+    padding: 8px 12px 10px;
   }
 }
 
@@ -558,6 +653,15 @@
 
   .ss-bodylist {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .ss-motion {
+    padding: 8px 10px 10px;
+  }
+
+  .ss-motion__controls,
+  .ss-motion__rates {
+    flex-wrap: wrap;
   }
 
   .ss-viewport__overlay--top-right {
