@@ -110,8 +110,8 @@ case-specific and not asserted as a general law.
 - Recorded constants still require provenance verification against live sources before being presented
   as sourced data.
 - Nothing here is a flight-safety, navigation, or impact-prediction capability.
-- Displayed geometry is not to scale (marker size and line widths are exaggerated), and playback shows
-  recorded samples only — neither affects the physics.
+- Displayed geometry is not to scale (marker size, line widths, and any render-only spacecraft-mesh scale are
+  exaggerated), and playback shows recorded samples only — neither affects the physics.
 
 ### 2.7 Cached JPL Horizons reference state (Phase 3)
 
@@ -135,6 +135,35 @@ case-specific and not asserted as a general law.
   not propagated. The UI labels the conversion, and records remain immutable until an explicit run.
 - The cached state is public NASA/JPL data. Attribution and the query are retained with the preset; the cache
   is not treated as a live forecast or a continuously updated service.
+
+### 2.8 Circular-orbit mission evaluation (Phase 4)
+
+**Status: implemented for one template, with explicit numerical criteria.**
+
+- The template is **Design a Stable Circular Earth Orbit**. The target altitude is 250–2,000 km. The target
+  radius is `r = R_Earth + targetAltitudeKm`; the documented target circular speed and period are
+  `v = sqrt(mu / r)` and `T = 2*PI*sqrt(r^3 / mu)`, with Earth mean radius and GM from
+  `src/simulation/constants.ts`. These values are formula-derived targets, not trajectory results.
+- The pass condition is: the engine result is completed; the recorded samples cover at least one target period;
+  at least 8 usable samples were recorded; every recorded altitude is within the target ±20 km; and every
+  recorded altitude is at least 200 km above the mean Earth radius. The 200 km clearance is a geometric check
+  in this simplified model, not an atmosphere, collision-risk, or operational clearance analysis.
+- PASS and FAIL are computed from the engine's recorded samples. The evaluator does not score the user's target
+  or speed input directly, does not infer a state between samples, and does not use the 3D scene geometry.
+- A completed run that violates the altitude window or clearance is FAIL. A missing, empty, non-finite,
+  malformed, stopped, truncated, or too-short result is NOT EVALUABLE. An unevaluable run is never converted into
+  a pass or a fail.
+- The user interface's Run Mission action extends the run window to at least two initial reference periods (and
+  enough periods to cover the target period) before invoking the unchanged engine. This changes only the
+  duration of the test trajectory; it does not add forces or alter integration.
+- The evaluator reports target altitude, tolerance, clearance, target radius, ideal circular speed, target
+  period, required/evaluated duration, recorded and usable sample counts, minimum/maximum/span altitude, run
+  status, warnings, and each criterion's observed values. Altitude span is descriptive, not a separate hidden
+  pass condition; the ±20 km window already bounds a valid span at 40 km.
+- The outcome is deterministic for the same target and recorded result. No random sampling, scoring model, or
+  AI-generated number is involved.
+- The GOES spacecraft GLB is render-only. Its geometry, scale, materials, and appearance are not physical inputs
+  and do not change the massless test-particle model, frame, initial state, mass, or numerical outcome.
 
 ## 3. Declare model fidelity
 
@@ -224,6 +253,15 @@ atmosphere, or any physical parameter. Venus uses a radar-derived surface map ra
 and Neptune uses an explicitly illustrative texture; the UI labels both. Loading the app on the Overview
 does not execute the two-body engine; the Lab baseline is created only on the first switch to the Lab.
 
+**Mission honesty (Phase 4, 2026-10-21).** The Mission Designer displays the objective, the exact criteria, and
+the target/ideal values before the run. Its outcome card names the evaluated record and states the reason. The
+criteria read recorded altitude extrema and the last recorded sample time; the metrics read the same result. A
+stopped or too-short run shows NOT EVALUABLE with the governing reason, and its recorded extrema remain labeled
+as recorded data rather than a score. “Stable” is used only in the template name and only means that this
+simplified two-body trajectory met the declared altitude, coverage, and clearance checks. It is not an
+operational stability, collision-risk, or flight-safety claim. The GOES mesh is render-only and is disclosed as
+such in the viewport, object browser, model notice, and public credits.
+
 **Comparison honesty (Milestone 3, 2026-10-19).** Baseline and candidate are separate run records, each
 bundling the parameters, engine configuration, and engine result of one run, so a displayed comparison cannot
 mix configurations. Editing parameters is not a result: the engine is called only on an explicit **Run
@@ -256,6 +294,15 @@ Tests need numerical tolerances and explanation. Avoid tests that merely assert 
 The cached reference parser is covered separately in `src/data/__tests__/`: it checks exact state preservation,
 source/format rejection, frame/center/unit/time-scale rejection, and malformed-table failure. The UI test checks
 that loading the preset does not run the engine and that a run uses the exact cached vector.
+
+The Phase 4 mission evaluator is covered by `src/missions/__tests__/circularOrbitMission.test.ts` using real
+engine runs: an ideal circular pass, completed ±1% speed cases that fail the altitude window, a completed
+clearance violation, invalid targets, empty/non-finite/malformed samples, a stopped run, insufficient duration,
+truncated recorded coverage, and repeated-evaluation determinism. `src/app/__tests__/missionView.test.tsx`
+exercises the pass/fail/not-evaluable UI, mode-switch record preservation, and the GOES render-only association.
+`src/scene/__tests__/spacecraftModels.test.ts` checks the GLB header, byte size, SHA-256, source metadata, and
+reference-only association. The local GOES mesh was also loaded and blocked in a real browser; the numerical
+sample count and mission outcome were identical in both cases.
 
 ## 9. AI guardrails
 

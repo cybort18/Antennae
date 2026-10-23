@@ -40,7 +40,7 @@ Simulation Results & Mission Evaluator
 
 ### UI and scene renderer
 
-The rendering layer may load curated third-party meshes and textures. Before any such asset is shipped, review its license and usage terms, record the attribution that license requires, and keep physical properties and scenario state independent from render geometry and display scale. Asset-load failures must degrade to a placeholder rather than alter or block the simulation state. The current build loads six local NASA textures (Earth surface and static clouds plus four planetary maps in the Overview) with procedural fallbacks; it has no general model loader.
+The rendering layer may load curated third-party meshes and textures. Before any such asset is shipped, review its license and usage terms, record the attribution that license requires, and keep physical properties and scenario state independent from render geometry and display scale. Asset-load failures must degrade to a placeholder rather than alter or block the simulation state. The current build loads six local NASA textures (Earth surface and static clouds plus four planetary maps in the Overview) with procedural fallbacks, plus one local NASA GOES GLB with a marker fallback. The GOES path is a specific reference-only loader; there is no general model catalogue or asset pipeline.
 
 
 Render scenario state, labels, object selection, trajectories, vector overlays, and controls. It must not independently calculate authoritative physics. Visual scaling must not mutate physical values.
@@ -73,76 +73,84 @@ Build a structured context from scenario and result records. The model explains 
 
 Prefer local scenario persistence and JSON export for an MVP. Add account/cloud persistence only when required. Provide a way to recover/export work rather than risking silent loss.
 
-## 3. Candidate frontend stack
+## 3. Active frontend stack
 
-If the repository has not selected a stack already, the starting proposal is React + TypeScript, Three.js with React Three Fiber/Drei for the scene, a chart library for result plots, and a rendering-independent TypeScript simulation module. Select dependencies based on repository constraints and keep the total dependency surface small.
+The application stack is firmly established: **React 19 + TypeScript + Vite**, with **Three.js (0.186)**, **React Three Fiber (9.8)**, and **Drei (10.7)** for 3D visualization, **Vitest (5.0)** for testing, and **oxlint** for static analysis. The simulation core is framework-independent pure TypeScript. No external charting library is used; the altitude comparison chart is a custom, zero-dependency hand-rendered SVG.
 
-Do not treat this suggested stack as authorization to overwrite an existing scaffold or introduce a new framework unnecessarily.
-
-## 4. Candidate repository structure
-
-Adapt names to existing conventions; do not perform a broad restructure solely to match this diagram.
+## 4. Repository structure
 
 ```text
 src/
-  app/             # routes, page composition, shell
-  components/      # reusable UI controls, panels, dialogs
-  scene/           # rendered bodies, camera, trails, overlays
-  scenarios/       # presets, schema, validation, save/load
-  simulation/      # units, state vectors, force models, integrators
-  missions/        # objectives, constraints, score/evaluation
-  data/            # JPL adapters, parsing, cache, provenance
-  results/         # result types, derived metrics, comparison
-  ai/              # context builder and Copilot UI/service
-  types/           # shared domain contracts
-  tests/           # unit and scenario/integration tests
-server/            # optional proxy for secrets or external APIs
-docs/              # decisions, assumptions, API/data contracts
+  simulation/      # Framework-independent physics core: units, constants, force model,
+                   # integrator, validation, runner, derived metrics, tests
+  scenarios/       # Editable inputs -> validated engine configuration (no physics here)
+  missions/        # Framework-independent circular-orbit evaluator and thresholds
+  data/            # Cached JPL Horizons fixture, parser, provenance, reference preset
+  comparison/      # Immutable run records, candidate runs, altitude series, shared-sample differences
+  results/         # Display metrics and formatting derived from recorded samples
+  solarSystem/     # Display-only Solar System registry: bodies, schematic layout, camera poses
+  app/             # Workspace panels, playback timeline, comparison chart, mission UI, Overview screen
+  scene/           # 3D viewports (display only, one-way km -> scene-unit transform) and GOES mesh
+  components/      # Presentation-only UI primitives (Panel, Button, Chip)
+  test/            # Shared test setup and DOM test utilities
+public/assets/     # Locally served visual assets (NASA Earth/planetary textures and GOES GLB)
+docs/              # Canonical technical documentation
 ```
 
-## 5. Suggested domain contracts
+## 5. Domain contracts
 
-Types below are illustrative; implement precise types after the force model, frame and unit conventions are finalized.
+Active contracts enforce strict separation between simulation state, reference data, and UI presentation:
 
 ```ts
-type Vec3 = { x: number; y: number; z: number };
-type UnitSystem = {
-  distance: "m" | "km";
-  time: "s";
-  mass: "kg";
-};
-type Provenance = {
-  source: "JPL_HORIZONS" | "JPL_SSD" | "NASA_FACTSHEET" | "USER_DEFINED" | "CACHED_FIXTURE";
-  targetId?: string;
-  retrievedAt?: string;
-  epoch?: string;
-  center?: string;
-  frame?: string;
-  units: UnitSystem;
-};
-type SimulationObject = {
-  id: string;
-  name: string;
-  kind: "body" | "asteroid" | "spacecraft";
-  massKg?: number;
-  radiusKm?: number;
-  position: Vec3;
-  velocity: Vec3;
-  isUserModified: boolean;
-  provenance?: Provenance;
-  visual?: { color?: string; displayScale?: number };
-};
-type SimulationConfig = {
-  model: "two-body" | "n-body" | "mission-thrust";
-  integrator: string;
-  timestepSeconds: number;
-  epoch: string;
-  forceModelVersion: string;
-};
-type SimulationRunStatus = "ready" | "running" | "completed" | "stopped" | "invalid" | "unstable";
-```
+// From src/simulation/types.ts:
+export interface Vec3 {
+  x: number;
+  y: number;
+  z: number;
+}
 
-There are no compatibility guarantees for these sample shapes yet; do not copy them mechanically if the selected model requires different fields. Avoid representing incompatible combinations as valid states.
+export interface StateVector {
+  positionKm: Vec3;
+  velocityKmS: Vec3;
+}
+
+export interface SimulationConfig {
+  initialState: StateVector;
+  centralBody: CentralBody;
+  timestepSeconds: number;
+  durationSeconds: number;
+  sampleIntervalSeconds: number;
+  stopConditions?: StopConditionConfig;
+}
+
+export interface SimulationResult {
+  samples: StateVector[];
+  timesSeconds: number[];
+  completedDurationSeconds: number;
+  status: SimulationRunStatus;
+  warnings: SimulationWarning[];
+}
+
+// From src/comparison/records.ts:
+export interface ScenarioRecord {
+  role: "baseline" | "candidate";
+  inputs: ScenarioInputs;
+  config: SimulationConfig;
+  result: SimulationResult;
+}
+
+// From src/missions/circularOrbitMission.ts:
+export interface CircularOrbitMissionResult {
+  status: "PASS" | "FAIL" | "NOT EVALUABLE";
+  reason: string;
+  targetAltitudeKm: number;
+  criteria: {
+    periodCoverage: MissionCriterion;
+    altitudeTolerance: MissionCriterion;
+    groundClearance: MissionCriterion;
+  };
+}
+```
 
 ## 6. Versioning and state integrity
 
@@ -167,12 +175,18 @@ There are no compatibility guarantees for these sample shapes yet; do not copy t
 `src/simulation/` — the isolated physics core. It is framework-independent: it imports no React,
 Three.js, or browser API, and it is verified by `src/simulation/__tests__/` (8 files, 72 tests).
 
-The UI, data, comparison, scenario, result, scene, and solar-system modules are verified by 16 further test
-files, including DOM interaction tests that drive the real component tree
+The UI, data, comparison, scenario, result, scene, solar-system, and mission modules are verified by further
+test files, including DOM interaction tests that drive the real component tree
 (`src/app/__tests__/workspace.test.tsx`, `src/app/__tests__/comparisonView.test.tsx`,
-`src/app/__tests__/referencePresetView.test.tsx`, `src/app/__tests__/overviewView.test.tsx`). The WebGL
-viewports are replaced by stubs in those tests because jsdom has no WebGL context; the rendered scenes were
-verified separately in a real browser.
+`src/app/__tests__/referencePresetView.test.tsx`, `src/app/__tests__/overviewView.test.tsx`,
+`src/app/__tests__/missionView.test.tsx`). The full suite is 27 files / 247 passing tests; the physics core
+accounts for 8 files / 72 tests. The WebGL viewports are replaced by stubs in those tests because jsdom has no
+WebGL context; the rendered scenes and the GOES GLB load/fallback were verified separately in a real browser.
+
+`src/missions/` — the framework-independent mission evaluator. It imports the simulation's documented
+constants and derived-metric helpers, accepts a target altitude and a `SimulationResult`, and returns a
+structured PASS / FAIL / NOT EVALUABLE result. It imports no React, Three.js, browser API, or comparison
+state. Evaluation reads recorded samples only; editable inputs are never treated as a result.
 
 `src/data/` — the cached reference-data boundary. It holds a provider-shaped JPL Horizons VECTORS fixture, a
 parser that enforces Earth body center, ICRF, TDB, geometric-state, and KM-S conventions, and one validated
@@ -210,38 +224,44 @@ scripts `dev`, `build`, `typecheck`, `lint`, `test`, `test:watch`, `preview`.
 | `app/AltitudeChart.tsx`, `app/altitudeChartMath.ts` | Dependency-free SVG chart and its physical-to-view scale/tick math |
 | `app/ComparisonPanel.tsx`, `app/ComparisonSummary.tsx` | Chart panel with series provenance, and the comparison metric table |
 | `app/ReferencePresetPanel.tsx` | Cached JPL Horizons provenance, exact vector, query/source, and load-into-candidate action |
-| `app/ModeTabs.tsx` | Reversible Solar System Overview / Earth Orbit Lab mode switch |
+| `app/ModeTabs.tsx` | Three-surface switch: Solar System Overview / Earth Orbit Lab / Mission Designer |
+| `app/MissionDesignerPanel.tsx` | Task-first target/initial-condition controls, Run Mission action, outcome, criteria, sample-derived metrics, disclosures |
+| `missions/circularOrbitMission.ts` | Circular-speed/period formulas, target validation, recorded-sample evaluation, and NOT EVALUABLE rules |
 | `app/SolarSystemOverview.tsx` | Default reference screen: body selector, selected-body facts, camera reset, scale/source disclosures |
 | `solarSystem/bodies.ts` | Display-only Sun + eight-planet registry, schematic positions, camera poses, and local texture metadata |
 | `scene/SolarSystemViewport.tsx` | Static Overview canvas, procedural orbit guides, DOM labels, selection/focus camera, texture fallbacks, credit overlay |
 | `scene/useLocalTexture.ts`, `scene/planetSurface.ts` | Shared local-texture loading/disposal and texture-or-fallback material state |
+| `scene/spacecraftModels.ts`, `scene/GoesSpacecraftModel.tsx` | GOES-16 asset metadata/provenance and lazy, render-only GLB loading with marker fallback |
 | `app/*.tsx` | Top bar (with record switcher), object browser, inspector, results, timeline, notices, status banners |
 | `scene/displayScale.ts` | One-way km → scene-unit transform (display only) |
-| `scene/SimulationViewport.tsx` and siblings | Canvas, textured central body with procedural fallback, deterministic star field, trajectory, marker, and display-only Orbit/Earth framing |
+| `scene/SimulationViewport.tsx` and siblings | Canvas, textured central body with procedural fallback, deterministic star field, trajectory, particle or render-only GOES mesh, and display-only Orbit/Earth framing |
 | `components/` | Presentation-only primitives (panel, chip, button, numeric field) |
 
 The dependency direction of section 1 is enforced by construction: `src/simulation/` imports no React,
-Three.js, or browser API; `src/comparison/` imports the engine and the scenario bridge but no React, so its
-comparison math is unit-testable in the node environment; the viewport consumes `SimulationResult.samples` and
-converts positions with a one-way display transform that is never read back into simulation state; the chart
-uses physical kilometres and recorded timestamps, not scene units; `results/` derives its metrics through the
-engine's own `derivedMetrics` utilities rather than re-deriving physics. UI-layer tests in `src/app/__tests__/`,
-`src/scenarios/__tests__/`, `src/results/__tests__/`, `src/comparison/__tests__/`, and `src/scene/__tests__/`
-cover the boundary; a lint rule forbidding UI imports inside `src/simulation` is still not in place.
+Three.js, or browser API; `src/missions/` imports simulation constants/utilities but no React or scene code;
+`src/comparison/` imports the engine and the scenario bridge but no React, so its comparison math is
+unit-testable in the node environment; the viewport consumes `SimulationResult.samples` and converts positions
+with a one-way display transform that is never read back into simulation state; the chart uses physical
+kilometres and recorded timestamps, not scene units; `results/` derives its metrics through the engine's own
+`derivedMetrics` utilities rather than re-deriving physics. UI-layer tests in `src/app/__tests__/`,
+`src/scenarios/__tests__/`, `src/results/__tests__/`, `src/comparison/__tests__/`, `src/missions/__tests__/`,
+and `src/scene/__tests__/` cover the boundary; a lint rule forbidding UI imports inside `src/simulation` is
+still not in place.
 
 ### Planned, not present
 
-`src/missions/`, `src/ai/`, `src/types/`, and `server/` do not exist yet. There is a cached reference-data
-adapter and one fixture in `src/data/`, but no live Horizons request/refresh path, provider cache service, or
-additional data source. No persistence layer, mission evaluator, general asset-loading pipeline, or AI service
+`src/ai/`, `src/types/`, and `server/` do not exist yet. There is a cached reference-data adapter and one
+fixture in `src/data/`, but no live Horizons request/refresh path, provider cache service, or additional data
+source. No persistence layer, mission history, general asset-loading pipeline, model catalogue, or AI service
 exists. There is no charting dependency: the single comparison chart is hand-rendered SVG and opens in a
-collapsible analysis drawer. The viewports load only the six local textures described in the public README;
-they load no models, star panoramas, or remote assets. The star field is deterministic procedural geometry.
+collapsible analysis drawer. The viewports load six local textures and one local GOES GLB; they load no star
+panoramas or remote assets. The star field is deterministic procedural geometry.
 
 ### Not yet decided in code
 
-Whether the scenario manager owns mission templates and how runs are persisted across sessions are still open;
-comparison records currently live in memory for the session only.
+The mission evaluator currently lives in `src/missions/`; whether a future scenario manager owns mission
+templates and how runs are persisted across sessions are still open. Comparison records and the mission target
+currently live in memory for the session only.
 
 ### Cached reference preset semantics
 
@@ -275,13 +295,39 @@ loaded from local paths through `useLocalTexture`; a load failure falls back to 
 All source pages, credits, dimensions, and byte sizes stay in the registry and are surfaced by the disclosure and
 the public README.
 
-Mode switching is reversible. `App.tsx` keeps the comparison state outside both screens and creates the initial
-Lab baseline only on the first switch to the Lab, so simply loading the app does not execute the engine. Returning
-to the Overview does not clear the baseline, candidate, draft, selected body, playback cursor, or records;
-switching to the Overview pauses playback so it does not advance while hidden. The mode switch also moves
-focus to the destination heading or main lab region. The Overview itself has no playback, parameter, or run
-controls.
+Mode switching is reversible. `App.tsx` keeps the comparison state outside all three surfaces and creates the
+initial baseline only on the first switch to the Lab or Mission Designer, so simply loading the app does not
+execute the engine. Switching among the three surfaces does not clear the baseline, candidate, draft, selected
+body, playback cursor, or records; every mode switch pauses playback so it does not advance while hidden. The
+switch moves focus to the destination heading or main lab region. The Overview itself has no playback,
+parameter, or run controls.
 
 Limitations are explicit in the UI: orbit guides indicate order only, sizes and spacing are compressed, positions
 are illustrative rather than an ephemeris, and no planetary dynamics or N-body model exists. The Overview does not
 represent moons, rings beyond Saturn's schematic ring, live data, weather, telemetry, or dates.
+
+### Mission evaluation semantics
+
+The Mission Designer is a UI over the same comparison records. `src/missions/circularOrbitMission.ts` exports
+one template and a pure evaluator. The target radius is `R_Earth + targetAltitudeKm`; the formula-derived target
+circular speed is `sqrt(mu / r)` and the period is `2*PI*sqrt(r^3 / mu)`, using the documented constants. The
+evaluator never reads the draft target/speed as a result.
+
+A result is **PASS** only when the engine reports a completed run, the recorded samples cover at least one target
+period, every recorded altitude is within ±20 km of the target, and every recorded altitude is at least 200 km
+above the mean Earth radius. A completed run that violates the altitude or clearance criterion is **FAIL**.
+Missing, empty, non-finite, malformed, stopped, truncated, or too-short results are **NOT EVALUABLE**, not a pass
+or fail. The UI's Run Mission action extends the test window to at least two initial reference periods before
+calling the existing engine; this is a run-window choice, not a new integrator or trajectory path. The metrics
+panel reports target and ideal circular values, recorded min/max/span altitude, evaluation duration, usable
+sample count, run status, and warnings. Altitude span is descriptive; it is not a separate hidden criterion.
+
+### Render-only GOES mesh
+
+The displayed GOES-16 reference or reference-derived record may carry a local NASA GOES GLB. The model is lazy
+loaded only for that record, normalized in scene units for legibility, and drawn at the recorded sample. It is a
+display asset: it is never read by `src/simulation/`, `src/missions/`, `src/results/`, or `src/comparison/`, and
+it does not add mass, physical radius, attitude, thrust, fuel, or dynamics. A load error falls back to the normal
+particle marker and the viewport states that the mesh was unavailable. The asset source, byte size, checksum,
+credit, usage uncertainty, and render-only disclosure are recorded in `docs/ASSETS.md` and surfaced in
+the viewport and model notice.

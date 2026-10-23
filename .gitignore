@@ -24,10 +24,10 @@ dist-ssr
 *.sw?
 
 # Kept local, never published: owner-supplied design brief, internal agent
-# instructions, and their rule packs.
+# rule packs, and archived local planning documents.
 *.pdf
-AGENTS.md
 .agents/
+docs/.archive/
 
 # Local environment and secret files
 .env

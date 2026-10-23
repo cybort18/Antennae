@@ -4,9 +4,11 @@ Antennae is a browser-based educational space-physics sandbox. It opens on a sch
 Overview** with the Sun and eight planets, then switches to an **Earth Orbit Lab** that simulates a
 massless test particle orbiting Earth under simplified two-body point-mass gravity, draws the trajectory
 the engine actually recorded in a 3D workspace, replays those samples as a timeline, and compares a
-baseline run with a modified candidate run through a computed altitude-versus-time chart. The Lab also
-loads one cached JPL Horizons reference state for GOES-16 with visible provenance and runs it as a
-clearly labelled hypothetical two-body initial condition.
+baseline run with a modified candidate run through a computed altitude-versus-time chart. A third surface,
+the **Mission Designer**, turns the same recorded runs into an objective-driven result for one circular
+Earth-orbit template. The Lab also loads one cached JPL Horizons reference state for GOES-16 with visible
+provenance and runs it as a clearly labelled hypothetical two-body initial condition; a locally served,
+render-only NASA GOES spacecraft mesh marks that reference when it is displayed.
 
 It is a learning and demonstration tool. It is **not** flight software, a navigation tool, or an
 impact-prediction service. The Overview is a static reference visualization, not a planetary dynamics
@@ -20,7 +22,8 @@ model or an ephemeris.
   Venus, Neptune) are served locally from NASA 3D Resources; the Sun, Mercury, Saturn, and Uranus use
   procedural display materials, and Saturn's rings are procedural geometry. The screen states that sizes,
   distances, and positions are compressed and illustrative, and it computes no planetary dynamics. Switching
-  to the Earth Orbit Lab and back is reversible; it does not clear the Lab's baseline or candidate records.
+  among the Overview, Earth Orbit Lab, and Mission Designer is reversible; it does not clear the shared baseline,
+  candidate, draft, or playback records.
 - **Deterministic two-body physics core** (`src/simulation/`), framework-independent TypeScript: point-mass
   gravity, fixed-step kick-drift-kick leapfrog integration, input validation, stop conditions, warnings, and
   byte-identical output for identical input.
@@ -33,20 +36,35 @@ model or an ephemeris.
   scales move a cursor through recorded samples only. Nothing interpolated is presented as simulation output.
 - **Baseline vs candidate comparison** (`src/comparison/`): each run is an immutable record of parameters,
   configuration, and engine result. Editing changes candidate *parameters* without integrating anything; the
-  engine runs for the initial Lab baseline, an explicit **Run candidate**, or **Restore baseline parameters**.
-  The initial baseline is created only on first entry to the Lab, so the default Overview does not execute the
-  engine. You can replace the baseline with a confirmed two-step action and read an
-  altitude-versus-simulated-time chart plus differences at the latest simulated time recorded by **both** runs.
+  engine runs for the initial baseline, an explicit **Run candidate**, **Restore baseline parameters**, or
+  **Run Mission**. The initial baseline is created only on first entry to the Lab or Mission Designer, so the
+  default Overview does not execute the engine. You can replace the baseline with a confirmed two-step action
+  and read an altitude-versus-simulated-time chart plus differences at the latest simulated time recorded by
+  **both** runs.
+- **Mission Designer** (`src/missions/`, `src/app/MissionDesignerPanel.tsx`): one template, **Design a Stable
+  Circular Earth Orbit**. The target altitude (250–2,000 km) is separate from the editable initial altitude and
+  tangential speed. The evaluator derives the target radius, circular speed, and period from the documented
+  Earth constants, then reads only the engine's recorded samples. A completed run must cover at least one target
+  period, keep every recorded altitude inside the target ±20 km window, and stay at least 200 km above the mean
+  Earth radius with at least 8 usable recorded samples. The result is **PASS**, **FAIL**, or **NOT EVALUABLE**,
+  with each criterion's observed values and reason. Missing, empty, non-finite, malformed, stopped, or too-short
+  results are not scored. The panel reports
+  target and ideal circular values, minimum/maximum/span altitude, evaluation duration, usable sample count, run
+  status, and warnings. Mission runs extend the test window to at least two initial reference periods so the
+  target period is covered; the trajectory still comes from the unchanged two-body engine.
 - **Cached NASA/JPL reference preset** (`src/data/`): one provider-shaped JPL Horizons VECTORS response for
   GOES-16, validated for Earth body center, ICRF frame, TDB epoch, geometric state, and km/s units. The panel
   displays the target, source, epoch, frame, center, units, retrieval time, query, and exact vector. Loading
   it places the exact cached state into the candidate draft; running it is an explicit, hypothetical
   two-body propagation. Editing altitude or speed visibly converts the candidate to a circular
   approximation while retaining the original provider vector and source provenance. No live network
-  request is made at runtime.
+  request is made at runtime. When a GOES-16 reference or reference-derived record is displayed, the viewport
+  lazily loads one official NASA GOES spacecraft GLB as a **render-only** marker; it adds no mass, attitude,
+  thrust, or dynamics, and a failed load falls back to the particle marker.
 - **Honest failure surfaces**: invalid parameters show the engine's own validation messages and change
   nothing; a stopped run keeps its status and warning and is never extended or animated as if it completed;
-  values that cannot be derived are reported as unavailable.
+  values that cannot be derived are reported as unavailable. Mission outcomes use the same rule: an
+  unevaluable run is not converted into a pass or a fail.
 
 ## The model and its limits
 
@@ -71,8 +89,8 @@ framing controls, and the comparison chart is a collapsible analysis drawer over
 The Solar System Overview is a **separate schematic reference view**. Its orbit guides indicate order
 only; body sizes, orbit spacing, and fixed phase angles are display composition values in scene units.
 They are not physical radii, distances, orbital elements, dates, or current positions, and they are never
-passed into the Earth Orbit Lab or the physics engine. It has no simulated time, weather, telemetry, or
-planetary motion. Focusing a body changes the camera only.
+passed into the Earth Orbit Lab, Mission Designer, or physics engine. It has no simulated time, weather,
+telemetry, or planetary motion. Focusing a body changes the camera only.
 
 The starting preset is an explicit synthetic idealisation, **not** NASA/JPL observational data. A second,
 opt-in preset is a cached JPL Horizons state vector for GOES-16. Its initial vector is source data, but the
@@ -82,14 +100,21 @@ handling, and the ICRF axes are used directly as the model's Earth-centered iner
 rotation. Editing a reference-derived state creates a circular approximation; the original cached vector
 is retained with the record but is no longer propagated. The application does not fetch Horizons at runtime.
 
+The Mission Designer does not add a second force model. It evaluates the same massless test particle against
+one explicit target condition. There is no thrust, fuel, mass, attitude, transfer burn, atmosphere, Earth
+rotation, frame conversion, collision model, or operational flight-safety claim. “Stable” means only that the
+recorded samples satisfy this template's altitude, coverage, and clearance criteria; it is not a statement
+about a real spacecraft or a certified orbit.
+
 ## Visual assets and credits
 
 The application uses six locally served NASA display images: two Earth Observatory Blue Marble images for
 the Earth Orbit Lab and the Overview Earth, and four NASA 3D Resources planetary maps for Mars, Jupiter,
-Venus, and Neptune in the Overview. They are **display assets only**: their pixels, cloud patterns, and
+Venus, and Neptune in the Overview. It also ships one local NASA GOES spacecraft GLB for the GOES-16
+reference view. They are **display assets only**: their pixels, geometry, materials, cloud patterns, and
 apparent weather do not define mass, radius, rotation, atmosphere, orbit, or any simulation state. All
 files are bundled with the app and served from its own origin; the app makes no third-party or provider
-texture request at runtime.
+asset request at runtime.
 
 | Use | File | Source | Credit and terms |
 |---|---|---|---|
@@ -99,14 +124,16 @@ texture request at runtime.
 | Jupiter surface | `public/assets/planets/jupiter.jpg` (720 × 360, 225,878 bytes) | [`Jupiter.jpg`](https://assets.science.nasa.gov/content/dam/science/cds/3d/resources/image/jupiter/Jupiter.jpg), from [NASA 3D Resources: Jupiter](https://science.nasa.gov/3d-resources/jupiter/) | JPL & Caltech. From Voyager images; from the JPL/Caltech planetary-map database. NASA content; use consistent with the NASA Images and Media Usage Guidelines. |
 | Venus surface | `public/assets/planets/venus.jpg` (1440 × 720, 1,166,974 bytes) | [`Venus.jpg`](https://assets.science.nasa.gov/content/dam/science/cds/3d/resources/image/venus/Venus.jpg), from [NASA 3D Resources: Venus](https://science.nasa.gov/3d-resources/venus/) | NASA/JPL-Caltech, inferred from the JPL/Caltech planetary-map database; the source page lists no separate credit line. Stitched from Magellan radar imagery with gaps filled by the published global texture. This is a radar-derived surface map, **not** a natural-colour cloud view. NASA content; use consistent with the NASA Images and Media Usage Guidelines. |
 | Neptune surface | `public/assets/planets/neptune.jpg` (720 × 360, 210,528 bytes) | [`Neptune.jpg`](https://assets.science.nasa.gov/content/dam/science/cds/3d/resources/image/neptune/Neptune.jpg), from [NASA 3D Resources: Neptune](https://science.nasa.gov/3d-resources/neptune/) | Don Davis & JPL/Caltech. A fictional cloud-feature texture created for visualization; **not** an observational map. NASA content; use consistent with the NASA Images and Media Usage Guidelines. |
+| GOES spacecraft mesh (render only) | `public/assets/models/goes-r.glb` (glTF 2.0 binary, 6,439,892 bytes; SHA-256 `C3549A276B7899253C60E82B0B24A3CFFB6A39E0DAD1A8C7F30A73E8DCEB6398`) | [NASA GOES Spacecraft 3D Model](https://science.nasa.gov/mission/goes-spacecraft-3d-model/); file: [`GOES-R.glb`](https://assets.science.nasa.gov/content/dam/science/missions/goes/spacecraft/3dmodel/GOES-R.glb) | NASA GOES Program / NASA Science. The page credits Lockheed Martin for labeled GOES-U spacecraft renderings; it does not publish a separate creator line or embedded copyright for the downloadable GLB. NASA 3D Resources states its assets are free and without copyright. Use consistent with the [NASA Images and Media Usage Guidelines](https://www.nasa.gov/nasa-brand-center/images-and-media/). No NASA insignia or logo is used. **Render-only:** the mesh adds no mass, attitude, thrust, fuel, or dynamics and does not change the simulated trajectory. |
 
-The two Earth files were verified on 2026-10-20; the four planetary files were verified on 2026-10-21, all
-as JPEGs (`FF D8 FF E0`) with the stated dimensions. The six files total 3,672,242 bytes (about 3.50 MiB);
-the four Phase 3.6 additions total 2,576,276 bytes (about 2.46 MiB) and do not count the pre-existing Earth
-assets. If the Earth surface texture is unavailable, the scene keeps a procedural Earth fallback; if a
-planet texture is unavailable or fails to load, that body falls back to its documented procedural colour.
-The local asset review register records the full review trail, including rejected candidates; as with the
-other internal planning notes, it is not part of this publication.
+The two Earth files were verified on 2026-10-20; the four planetary files and the GOES GLB were verified on
+2026-10-21. The six images total 3,672,242 bytes (about 3.50 MiB); the GOES GLB adds 6,439,892 bytes
+(about 6.14 MiB), for 10,112,134 bytes (about 9.64 MiB) of local visual assets. If the Earth surface texture
+is unavailable, the scene keeps a procedural Earth fallback; if a planet texture is unavailable or fails to
+load, that body falls back to its documented procedural colour. If the GOES mesh is unavailable, the viewport
+keeps the particle marker and states that the mesh was unavailable. The local asset review register records
+the full review trail, including rejected candidates; as with the other internal planning notes, it is not
+part of this publication.
 
 ## Requirements
 
@@ -126,11 +153,12 @@ other internal planning notes, it is not part of this publication.
 | `npm run build` | Type-check and produce a production bundle in `dist/` |
 | `npm run preview` | Serve the production build locally |
 
-Current verification (2026-10-21): `npm test` reports 226 passing tests in 24 files and `npm run
+Current verification (2026-10-21): `npm test` reports 247 passing tests in 27 files and `npm run
 typecheck`, `npm run lint`, and `npm run build` exit 0. Re-run the commands rather than trusting those
 numbers; the automated tests cover the physics core, the scenario bridge, result summaries, the comparison
 math, the cached reference parser/provenance, texture-load fallback handling, the Solar System body
-registry and screen behavior, and the workspace interaction flows.
+registry and screen behavior, the circular-orbit mission evaluator, the mission interaction flow, the GOES
+GLB header/checksum/provenance contract, and the existing workspace interaction flows.
 
 ## Project structure
 
@@ -139,56 +167,64 @@ src/
   simulation/   # Framework-independent physics core: units, constants, force model,
                 # integrator, validation, runner, derived metrics, tests
   scenarios/    # Editable inputs -> validated engine configuration (no physics here)
+  missions/     # Framework-independent circular-orbit evaluator and thresholds
   data/         # Cached JPL Horizons fixture, parser, provenance, reference preset
   comparison/   # Run records, candidate runs, altitude series, shared-sample differences
   results/      # Display metrics and formatting derived from recorded samples
   solarSystem/  # Display-only Solar System registry: bodies, schematic layout, camera poses
-  app/          # Workspace panels, playback, comparison chart, Overview screen, layout styles
-  scene/        # 3D viewports (display only, one-way km -> scene-unit transform)
+  app/          # Workspace panels, playback, comparison chart, mission UI, Overview screen
+  scene/        # 3D viewports (display only, one-way km -> scene-unit transform) and GOES mesh
   components/   # Presentation-only UI primitives
   test/         # Shared test setup
-public/assets/  # Locally served visual assets (NASA Earth and planetary textures)
+public/assets/  # Locally served visual assets (NASA Earth/planetary textures and GOES GLB)
 docs/           # Technical documentation (see below)
 ```
 
 ## Documentation
 
-- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — module boundaries, dependency direction, and the
-  responsibilities of the simulation core, scenario bridge, comparison layer, and rendering layer.
-- [`docs/PHYSICS_AND_SCIENTIFIC_INTEGRITY.md`](docs/PHYSICS_AND_SCIENTIFIC_INTEGRITY.md) — the model
-  contract, units and frame, integrator and timing behaviour, validation and stop conditions, measured
-  numerical evidence, and the claims this project must not make.
-
-Additional internal planning notes (decision log, roadmap and acceptance criteria, product brief, data and
-asset planning) are intentionally not part of this publication.
+- [`AGENTS.md`](AGENTS.md) — shared cross-agent operational rules and engineering guidelines.
+- [`PRD.md`](PRD.md) — product thesis, user personas, journeys, roadmap, and acceptance criteria.
+- [`DESIGN.md`](DESIGN.md) — V3 minimalist canvas-first workspace principles, layout hierarchy, and visual rules.
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — module boundaries, dependency direction, and the responsibilities of simulation, bridge, and rendering layers.
+- [`docs/PHYSICS_AND_SCIENTIFIC_INTEGRITY.md`](docs/PHYSICS_AND_SCIENTIFIC_INTEGRITY.md) — the model contract, units and frame, integrator and timing behaviour, validation, stop conditions, and numerical evidence.
+- [`docs/DATA_SOURCES.md`](docs/DATA_SOURCES.md) — NASA/JPL data provenance, cached GOES-16 Horizons contract, and parser validation rules.
+- [`docs/ASSETS.md`](docs/ASSETS.md) — 3D asset pipeline, item-level attribution register, and render-only fallback behavior.
+- [`docs/DECISIONS.md`](docs/DECISIONS.md) — append-only architectural and product decision history.
 
 ## Not implemented yet
 
-- Live NASA/JPL refresh and additional curated targets (the current milestone ships one cached Horizons
+- Live NASA/JPL refresh and additional curated targets (the current build ships one cached Horizons
   reference preset with provenance).
-- Mission designer: templates, target conditions, and pass/fail evaluation from computed values.
+- Additional mission templates, mission history, and configurable acceptance thresholds. One circular-orbit
+  template is implemented; the app does not score arbitrary mission designs.
 - An AI explanation layer; the simulation works without one and no results are generated by a model.
-- 3D spacecraft models and a general asset-loading pipeline; the current build adds only the six local
-  texture files described above and their procedural fallbacks.
+- A general 3D asset-loading pipeline or a spacecraft model catalogue. The current build adds one verified,
+  lazily loaded, render-only GOES GLB plus the six local textures described above and their fallbacks.
 - Persistence, accounts, sharing, and deployment configuration.
 - Additional force models (N-body, thrust, drag) and any multi-body or spacecraft dynamics. The Solar
   System Overview is static; it does not model planetary motion or N-body gravity.
 
 ## Verification
 
-The Solar System Overview and Earth Orbit Lab were exercised end-to-end in a real browser (production
-build) as well as in the automated suite. The Overview was checked at 1600×1000, 1280×800, 900×800, and
-390×844: all nine bodies rendered with WebGL 2, labels projected, body selection and camera focus/reset
-worked, and the six local textures (five in the Overview, the cloud layer in the Lab) returned 200 across
-the run. The details panel identified Earth as **NASA Earth Observatory** and the planet maps as **NASA 3D
-Resources**, and the viewport credit named both sources. No horizontal overflow, console error, page error,
-failed request, or external request was observed. The Lab flow loaded the cached GOES-16 state without
-running it, ran the candidate explicitly, showed the two-series chart, advanced playback, and preserved the
-candidate and records across repeated Overview/Lab switches at each viewport. Switching to the Overview pauses
-playback instead of advancing it out of view; the cursor position is retained. Focus moves to the destination
-heading/main region. The automated suite
-also covers the default landing mode, body registry and texture provenance, fallback material state, the
-cached reference parser/provenance, comparison records and math, and the existing workspace interactions.
+The Solar System Overview, Earth Orbit Lab, and Mission Designer were exercised end-to-end in a real browser
+(production build) as well as in the automated suite. The Mission Designer was checked at 1600×1000,
+1280×800, and 390×844: the objective, PASS/FAIL/NOT EVALUABLE outcome, target/initial controls, and **Run
+Mission** action were visible; the default baseline passed; ±1% speed cases completed but failed the target
+window; a stopped run and an invalid target were NOT EVALUABLE; the chart still compared the baseline and
+candidate; and no horizontal overflow occurred. The baseline/candidate records survived repeated Mission →
+Lab → Mission switches, and playback paused on mode changes. The Overview remained static and disclosed as
+not a dynamics simulation.
+
+The GOES-16 reference flow loaded the cached state without running it, ran it explicitly, and displayed the
+local NASA mesh with the render-only badge, legend, and credit. A forced model-request block produced the
+marker fallback and the same 17,230-record sample count and mission outcome as the loaded run, so the mesh
+had no numerical effect. Normal flows produced no console error, page error, failed local request, or
+external request. The blocked-model check necessarily produced the browser's failed-resource network message,
+but no page error and the app remained usable. Focus moves to the destination heading/main region; the
+Mission Designer focuses its objective heading. The automated suite also covers the default landing mode,
+body registry and texture provenance, fallback material state, cached reference parser/provenance,
+comparison records and math, the mission evaluator, the mission UI, the GOES asset contract, and the existing
+workspace interactions.
 
 ## License
 
