@@ -1971,49 +1971,58 @@ select.field__input {
 }
 
 .inspector-disclosure {
-  margin-top: 10px;
-  border: 1px solid rgba(133, 164, 194, 0.16);
-  border-radius: var(--radius-sm);
-  background: rgba(7, 13, 22, 0.6);
-  overflow: hidden;
-  transition: border-color 0.16s ease;
+  margin-top: 8px;
+  border-top: 1px solid rgba(133, 164, 194, 0.14);
+  padding-top: 4px;
 }
 
 .inspector-disclosure summary {
-  padding: 8px 12px;
-  font-size: 0.74rem;
-  font-weight: 600;
+  padding: 5px 0;
+  font-size: 0.72rem;
+  font-weight: 500;
   color: var(--text-muted);
   cursor: pointer;
   user-select: none;
-  background: rgba(133, 164, 194, 0.05);
-  transition: all 0.14s ease;
+  list-style: none;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 6px;
+  transition: color 0.14s ease;
+}
+
+.inspector-disclosure summary::-webkit-details-marker {
+  display: none;
+}
+
+.inspector-disclosure summary::before {
+  content: '+';
+  width: 11px;
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: 0.78rem;
+}
+
+.inspector-disclosure[open] summary::before {
+  content: '−';
 }
 
 .inspector-disclosure summary:hover {
   color: var(--text);
-  background: rgba(133, 164, 194, 0.1);
 }
 
 .inspector-disclosure[open] summary {
-  border-bottom: 1px solid rgba(133, 164, 194, 0.14);
   color: var(--accent);
 }
 
 .inspector-disclosure .metrics,
 .inspector-disclosure .record-block {
-  padding: 10px;
+  margin-top: 6px;
 }
 
 .inspector-preview-metrics {
-  margin-top: 10px;
-  padding: 8px 10px;
-  background: rgba(133, 164, 194, 0.05);
-  border: 1px solid rgba(133, 164, 194, 0.14);
-  border-radius: var(--radius-sm);
+  margin-top: 8px;
+  padding: 6px 0 2px;
+  border-top: 1px solid rgba(133, 164, 194, 0.14);
 }
 
 .field__actions--secondary {
@@ -2109,8 +2118,21 @@ select.field__input {
     padding: 8px 10px;
   }
 
+  .topbar .mode-tabs {
+    width: 100%;
+  }
+
+  .topbar .mode-tabs__tab {
+    flex: 1;
+    text-align: center;
+  }
+
   .topbar__controls {
     flex-wrap: wrap;
+  }
+
+  .viewport__hud-badge {
+    display: none;
   }
 
   .timeline {

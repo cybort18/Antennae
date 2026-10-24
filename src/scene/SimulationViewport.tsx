@@ -11,7 +11,7 @@
  * recorded scene; they do not change physical coordinates or camera scale data.
  */
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { GizmoHelper, GizmoViewport, OrbitControls, PerspectiveCamera } from '@react-three/drei';
 
@@ -55,8 +55,23 @@ export function SimulationViewport({
   const sample = result.samples[safeIndex];
   const [cameraMode, setCameraMode] = useState<CameraMode>('orbit');
   const [failedModel, setFailedModel] = useState<SpacecraftModelId | null>(null);
+  const [compactViewport, setCompactViewport] = useState(
+    () => typeof window !== 'undefined' && window.innerWidth <= 1180,
+  );
   const modelAsset = spacecraftModelAsset(spacecraftModel);
   const modelFailed = spacecraftModel !== null && failedModel === spacecraftModel;
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return undefined;
+    }
+    const updateCompact = () => {
+      setCompactViewport(window.innerWidth <= 1180);
+    };
+    updateCompact();
+    window.addEventListener('resize', updateCompact);
+    return () => window.removeEventListener('resize', updateCompact);
+  }, []);
 
   const bodyRadiusUnits = toSceneUnits(bodyRadiusKm);
   const sceneExtentUnits = toSceneUnits(sceneExtentKm);
@@ -133,7 +148,10 @@ export function SimulationViewport({
           maxDistance={cameraFit.maxDistance}
         />
 
-        <GizmoHelper alignment="bottom-right" margin={[376, 190]}>
+        <GizmoHelper
+          alignment="bottom-right"
+          margin={compactViewport ? [56, 72] : [376, 190]}
+        >
           <GizmoViewport axisColors={['#f0736a', '#7ee081', '#6aa9f0']} labelColor="#04121f" />
         </GizmoHelper>
       </Canvas>

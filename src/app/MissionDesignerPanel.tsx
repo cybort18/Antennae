@@ -173,7 +173,6 @@ export function MissionDesignerPanel({
             max={MISSION_TARGET_ALTITUDE_MAX_KM}
             step={10}
             onCommit={onTargetAltitudeChange}
-            hint={`Allowed target range: ${MISSION_TARGET_ALTITUDE_MIN_KM}–${MISSION_TARGET_ALTITUDE_MAX_KM} km.`}
           />
 
           {!targetValid ? (

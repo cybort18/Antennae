@@ -127,9 +127,18 @@ function SelectedBodyPanel({
       aria-labelledby="ss-selected-heading"
       aria-live="polite"
     >
-      <header className="panel__header">
-        <h2 id="ss-selected-heading">Selected body</h2>
-        <p className="panel__subtitle">Reference visualization &amp; physical facts</p>
+      <header className="panel__header ss-selected__header">
+        <div>
+          <h2 id="ss-selected-heading">Selected body</h2>
+          <p className="panel__subtitle">Reference visualization &amp; physical facts</p>
+        </div>
+        <Button
+          variant={focusMode === 'overview' ? 'primary' : 'default'}
+          onClick={onResetView}
+          title="Return the camera to the whole Solar System"
+        >
+          Overview view
+        </Button>
       </header>
       <div className="panel__body">
         <div className="ss-selected__title">
@@ -284,16 +293,6 @@ function SelectedBodyPanel({
         ) : null}
 
         <p className="overview-note">{SOLAR_SYSTEM_SCALE_NOTE}</p>
-
-        <div className="ss-actions">
-          <Button
-            variant={focusMode === 'overview' ? 'primary' : 'default'}
-            onClick={onResetView}
-            title="Return the camera to the whole Solar System"
-          >
-            Overview view
-          </Button>
-        </div>
 
         <details className="ss-disclosure">
           <summary>Sources, scale &amp; limitations</summary>
@@ -630,17 +629,18 @@ export function SolarSystemOverview({
   return (
     <div className="overview" data-mode="overview">
       <header className="overview__header">
-        <div className="overview__brand">
+        <div className="topbar__brand">
           <span className="topbar__mark" aria-hidden="true" />
-          <div>
-            <p className="overview__kicker">Antennae · Space Sandbox</p>
-            <h1 id="overview-title" tabIndex={-1}>
-              Solar System Overview
-            </h1>
-            <p className="overview__subtitle">Reference visualization · not a dynamics simulation</p>
-          </div>
+          <span className="topbar__title">Antennae</span>
+          <span className="topbar__product">Space Sandbox</span>
         </div>
         <ModeTabs mode="overview" onChange={handleModeSelect} />
+        <div className="overview__summary">
+          <h1 id="overview-title" tabIndex={-1}>
+            Solar System Overview
+          </h1>
+          <p className="overview__subtitle">Reference visualization · not a dynamics simulation</p>
+        </div>
       </header>
 
       <main className="overview__stage">

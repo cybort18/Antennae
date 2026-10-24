@@ -2,7 +2,7 @@
 
 **Repository:** [https://github.com/cybort18/Antennae](https://github.com/cybort18/Antennae)  
 **Document Status:** Canonical UX/UI Specification (V3 Minimalist Workspace Standard)  
-**Last Verified:** 2026-10-23 (Responsive viewports: 1600×1000, 1280×800, 900×800, 390×844)
+**Last Verified:** 2026-10-24 (Responsive viewports: 1600×1000, 1440×900, 1280×800, 900×800, 390×844)
 
 ---
 
@@ -75,12 +75,14 @@ The V3 redesign establishes a clean, canvas-first interface where the 3D scene o
 ## 3. Surface-Specific Hierarchy & Flow
 
 ### 3.1 Solar System Overview
-- **Visual Composition:** Fixed schematic layout of the Sun and eight planets against a deterministic procedural star field.
-- **Labels:** Crisp DOM-rendered button labels projected from 3D camera coordinates each frame. Clicking a label or list item selects the body.
+- **Visual Composition:** Compressed schematic layout of the Sun, eight planets, and near-Earth asteroid **101955 Bennu** against a deterministic procedural star field.
+- **Labels & Collision Resolution:** Crisp DOM-rendered button labels projected from 3D camera coordinates each frame. A deterministic screen-space priority resolver (`resolveSolarSystemLabelCollisions`) hides lower-priority overlapping labels during multi-year motion while keeping the selected body and Sun anchored; every body remains selectable in the left `Bodies` list.
 - **Interactions:**
-  - Selecting a body opens a compact floating card displaying physical facts (mean radius, period, semi-major axis) and local NASA 3D Resources texture attribution.
-  - Camera focus transitions smoothly to the selected planet; the **Overview view** button resets to system framing.
-  - *Disclosure:* A prominent badge states **REFERENCE VISUALIZATION · NOT TO SCALE · No simulated time**.
+  - Selecting a body opens a compact floating card displaying sourced NASA/JPL physical and orbital facts (mean radius, sidereal period, semi-major axis, eccentricity, inclination) and display-asset attribution.
+  - Camera focus transitions smoothly to the selected body; the **Overview view** button in the `Selected body` panel header resets to system framing without requiring the user to scroll to the bottom of the panel.
+  - Focusing **101955 Bennu** lazy-loads the official NASA VTAD 3D GLB shape model (with a procedural faceted rocky fallback at wide overview or if asset loading fails).
+  - **Opt-In Schematic Motion:** The bottom **Illustrative Schematic Motion** strip (`0–3,650 Earth days`, paused at `+0.0 d` by default) advances bodies along compressed circular guides at period-proportional rates (`10`, `60`, `365`, `1,000 d/s`) without invoking the two-body physics engine.
+  - *Disclosures:* Prominent badges state **REFERENCE VISUALIZATION · NOT TO SCALE** and **ILLUSTRATIVE MOTION · NOT AN EPHEMERIS**.
 
 ### 3.2 Earth Orbit Lab
 - **Visual Composition:** Central Earth with NASA Blue Marble surface texture and static cloud layer (with procedural fallback), white test particle marker, and recorded orbit trail.
@@ -110,26 +112,35 @@ The V3 redesign establishes a clean, canvas-first interface where the 3D scene o
 
 ### 4.1 Color System
 
-| Token | Hex Value | Semantic Usage |
+| Token | Hex / Value | Semantic Usage |
 |---|---|---|
-| `bg-space` | `#080c16` | Deep space canvas background |
-| `surface-panel` | `rgba(13, 20, 36, 0.92)` | Floating glassmorphism drawer and panel surfaces |
-| `border-subtle` | `rgba(255, 255, 255, 0.08)` | Dividers, card borders, subtle bounding boxes |
-| `accent-baseline` | `#4a90e2` | Baseline scenario, reference state, cool blue trajectory |
-| `accent-candidate` | `#00e5ff` | Candidate draft, modified parameters, cyan trajectory |
-| `status-pass` | `#00e676` | Evaluated mission pass, verified criteria, green outcome card |
-| `status-warn` | `#ffb300` | Target markers, coarse timestep warning, unrun changes badge |
-| `status-fail` | `#ff5252` | Evaluated mission failure, invalid input, stopped run alert |
-| `text-primary` | `#f0f4f8` | Primary headings, active metrics, critical copy |
-| `text-secondary` | `#94a3b8` | Supporting descriptions, units, labels, metadata |
+| `bg-space` | `#02050a` / `#070d16` | Deep space canvas and workspace shell background |
+| `surface-panel` | `rgba(7, 13, 22, 0.97)` | Instrument-grade dark floating panel surfaces |
+| `border-subtle` | `rgba(133, 164, 194, 0.14)` | Hairline dividers, card borders, subtle bounding boxes |
+| `accent-baseline` | `#86a9ff` | Baseline scenario, reference state, cool blue trajectory |
+| `accent-candidate` | `#7bd7e8` / `#8fe9f3` | Candidate draft, modified parameters, cyan trajectory |
+| `action-primary` | `#103a48` | Restrained instrument-grade primary button fill (`Run candidate`, `Run Mission`) |
+| `status-pass` | `#4cc38a` | Evaluated mission pass, verified criteria, green outcome card |
+| `status-warn` | `#efbd61` | Target markers, coarse timestep warning, unrun changes badge |
+| `status-fail` | `#f27b7d` | Evaluated mission failure, invalid input, stopped run alert |
+| `text-primary` | `#e7f0fa` | Primary headings, active metrics, critical copy |
+| `text-secondary` | `#9aacbe` | Supporting descriptions, units, labels, metadata |
 
 ### 4.2 Typography & Numbers
-- **Font Stack:** Clean, modern sans-serif (`Inter`, `system-ui`, `-apple-system`, `sans-serif`).
-- **Tabular Numerals:** All coordinates, times, speeds, and altitudes use `font-variant-numeric: tabular-nums` to prevent layout jitter during scrubbing and playback.
+- **Font Stack:** Clean sans-serif (`Inter`, `Segoe UI`, `system-ui`, `-apple-system`, `sans-serif`) paired with technical monospace (`ui-monospace`, `SFMono-Regular`, `Cascadia Mono`, `Consolas`, `monospace`) for numerical readouts, ranges, and provenance queries.
+- **Tabular Numerals:** All coordinates, times, speeds, altitudes, and schematic day counters use `font-variant-numeric: tabular-nums` to prevent layout jitter during scrubbing and playback.
 - **Type Hierarchy:**
-  - Section Headings: 13–14px bold, uppercase with subtle letter-spacing (`0.05em`).
-  - Metric Values: 16–20px semibold monospace.
-  - Labels & Units: 11–12px regular with muted secondary coloring.
+  - Section Headings: `0.72–0.74rem` semibold, uppercase with restrained letter-spacing (`0.08–0.11em`).
+  - Metric & Fact Values: `0.71–0.80rem` monospace with `tabular-nums`.
+  - Labels & Units: `0.68–0.74rem` regular with muted secondary coloring.
+
+### 4.3 UI/UX Quality & Anti-Slop Discipline
+Antennae is a scientific 3D sandbox, not a generic SaaS marketing dashboard. All UI changes adhere to these editorial and usability guardrails:
+1. **Canvas First, Chrome Second:** The 3D viewport is the primary workspace. Side panels stay compact and docked to the outer edges; center-screen modals, hero banners, and decorative card walls are prohibited.
+2. **Restrained Instrument Surfaces:** Prefer flat, high-legibility dark surfaces (`rgba(7, 13, 22, 0.97)`) and hairline dividers (`1px solid rgba(133, 164, 194, 0.14)`) over nested boxes-within-boxes, heavy drop shadows, or neon glow effects.
+3. **One Clear Primary Action per Surface:** Each simulation panel has one unmistakable primary CTA (**Run candidate** in Earth Orbit Lab, **Run Mission** in Mission Designer). Helper actions (**Use circular speed**, **Use ideal circular start**, **Overview view**) use secondary or inline styling so they never compete with the primary run trigger.
+4. **No Redundant Copy or Decorative Chrome:** Do not repeat the same range, status, or unit in adjacent labels, badges, and helper hints. Every badge, chip, and note must communicate distinct operational or scientific state.
+5. **Consistent Header & Navigation Geometry:** The top bar maintains a consistent brand lockup and `ModeTabs` position across **Solar System**, **Earth Orbit Lab**, and **Mission Designer** so switching modes never causes the navigation chrome to jump.
 
 ---
 
