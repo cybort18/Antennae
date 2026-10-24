@@ -10,12 +10,13 @@
  * physical units or written into the Earth Orbit Lab state.
  */
 
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Line, OrbitControls, PerspectiveCamera } from '@react-three/drei';
 import { AdditiveBlending, DoubleSide, Vector3 } from 'three';
 
 import {
+  BENNU_MODEL,
   SOLAR_SYSTEM_BODIES,
   bodyById,
   cameraPose,
@@ -24,6 +25,8 @@ import {
   type SolarSystemBodyId,
 } from '../solarSystem/bodies';
 import { schematicBodyPosition } from '../solarSystem/schematicMotion';
+import { BennuAsteroidModel } from './BennuAsteroidModel';
+import { type BennuMeshStatus } from './bennuModel';
 import { Starfield } from './Starfield';
 import { planetSurfaceState } from './planetSurface';
 import {
@@ -412,6 +415,7 @@ export type SolarSystemViewportProps = {
   focusSignal: number;
   elapsedDays?: number;
   onSelect: (id: SolarSystemBodyId) => void;
+  onBennuMeshStatusChange?: (status: BennuMeshStatus) => void;
 };
 
 export function SolarSystemViewport({
@@ -420,8 +424,11 @@ export function SolarSystemViewport({
   focusSignal,
   elapsedDays = 0,
   onSelect,
+  onBennuMeshStatusChange,
 }: SolarSystemViewportProps) {
   const initialPose = cameraPose(focusMode, selectedId, elapsedDays);
+  const [bennuMeshStatus, setBennuMeshStatus] =
+    useState<BennuMeshStatus>('procedural-overview');
   const labelRefs = useRef<LabelRefMap>({});
   const labelDimensionsRef = useRef<
     Record<SolarSystemBodyId, { width: number; height: number }>
@@ -435,8 +442,17 @@ export function SolarSystemViewport({
     saturn: { ...FALLBACK_LABEL_DIMENSIONS.saturn },
     uranus: { ...FALLBACK_LABEL_DIMENSIONS.uranus },
     neptune: { ...FALLBACK_LABEL_DIMENSIONS.neptune },
+    bennu: { ...FALLBACK_LABEL_DIMENSIONS.bennu },
   });
   const measuredMaskRef = useRef<Partial<Record<SolarSystemBodyId, boolean>>>({});
+
+  const handleBennuMeshStatusChange = useCallback(
+    (status: BennuMeshStatus) => {
+      setBennuMeshStatus(status);
+      onBennuMeshStatusChange?.(status);
+    },
+    [onBennuMeshStatusChange],
+  );
 
   useEffect(() => {
     const handleResize = (): void => {
@@ -543,22 +559,34 @@ export function SolarSystemViewport({
           />
         ))}
 
-        {SOLAR_SYSTEM_BODIES.filter((body) => body.id !== 'sun').map((body) => (
-          <PlanetBody
-            key={body.id}
-            body={body}
-            elapsedDays={elapsedDays}
-            selected={body.id === selectedId}
-            onSelect={onSelect}
-          />
-        ))}
+        {SOLAR_SYSTEM_BODIES.filter((body) => body.id !== 'sun').map((body) =>
+          body.id === 'bennu' ? (
+            <BennuAsteroidModel
+              key={body.id}
+              body={body}
+              position={schematicBodyPosition(body.id, elapsedDays)}
+              selected={body.id === selectedId}
+              focusMode={focusMode}
+              onSelect={onSelect}
+              onMeshStatusChange={handleBennuMeshStatusChange}
+            />
+          ) : (
+            <PlanetBody
+              key={body.id}
+              body={body}
+              elapsedDays={elapsedDays}
+              selected={body.id === selectedId}
+              onSelect={onSelect}
+            />
+          ),
+        )}
 
         <OrbitControls
           makeDefault
           enableDamping
           dampingFactor={0.08}
           target={[0, 0, 0]}
-          minDistance={2}
+          minDistance={0.9}
           maxDistance={100}
         />
       </Canvas>
@@ -599,6 +627,23 @@ export function SolarSystemViewport({
 
       <div className="ss-viewport__overlay ss-viewport__overlay--top-right">
         <p className="ss-viewport__hint">Drag to orbit · scroll to zoom</p>
+        {selectedId === 'bennu' && focusMode === 'body' ? (
+          <span
+            className={
+              bennuMeshStatus === 'fallback'
+                ? 'ss-badge ss-badge--muted'
+                : 'ss-badge'
+            }
+            data-testid="bennu-mesh-status"
+            title={BENNU_MODEL.renderNote}
+          >
+            {bennuMeshStatus === 'fallback'
+              ? 'Bennu mesh unavailable · procedural rocky fallback'
+              : bennuMeshStatus === 'ready'
+                ? 'NASA VTAD Bennu mesh · exaggerated display scale'
+                : 'Loading NASA Bennu mesh · procedural rocky fallback'}
+          </span>
+        ) : null}
       </div>
 
       <div className="ss-viewport__overlay ss-viewport__overlay--bottom-left">
@@ -626,6 +671,21 @@ export function SolarSystemViewport({
         >
           Planet maps: NASA 3D Resources
         </a>
+        {selectedId === 'bennu' ? (
+          <>
+            <span className="ss-viewport__credit-separator"> · </span>
+            <a
+              className="ss-viewport__credit"
+              data-testid="bennu-model-credit"
+              href={BENNU_MODEL.sourcePageUrl}
+              target="_blank"
+              rel="noreferrer"
+              title={BENNU_MODEL.creditDetail}
+            >
+              Bennu 3D model: NASA VTAD
+            </a>
+          </>
+        ) : null}
       </div>
     </div>
   );

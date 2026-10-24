@@ -48,13 +48,13 @@ These are candidates recorded in the project blueprint. Verify current docs, sch
 - **Known limitation:** ICRF is used directly as the model's Earth-centered inertial axes; the model has no
   epoch/time-scale or frame-rotation handling. The simulated trajectory is hypothetical.
 
-### 2b. Solar System Overview static reference facts (2026-10-23)
+### 2b. Solar System Overview static reference facts (2026-10-23, extended 2026-10-24)
 
 `src/solarSystem/bodies.ts` includes static, educational physical reference facts (`SolarSystemPhysicalFacts`) for
-the Sun and eight planets. These values are displayed in the Overview's selected-body panel and provide the
-sidereal orbital periods used by the Overview's opt-in, period-proportional schematic motion
-(`src/solarSystem/schematicMotion.ts`). They make **no runtime network requests** and never feed the Earth-centered
-two-body simulation engine (`src/simulation/`).
+the Sun, eight planets, and near-Earth asteroid **101955 Bennu**. These values are displayed in the Overview's
+selected-body panel and provide the sidereal orbital periods used by the Overview's opt-in, period-proportional
+schematic motion (`src/solarSystem/schematicMotion.ts`). They make **no runtime network requests** and never feed
+the Earth-centered two-body simulation engine (`src/simulation/`).
 
 - **Sources and field provenance:**
   1. **JPL Planetary Physical Parameters** (`https://ssd.jpl.nasa.gov/planets/phys_par.html`) — volumetric mean
@@ -80,6 +80,24 @@ two-body simulation engine (`src/simulation/`).
      central Sun are explicitly `null` (displayed as `Not applicable (central star)`).
   5. **JPL Astrodynamic Parameters** (`https://ssd.jpl.nasa.gov/astro_par.html`) — exact Julian year definition
      (`1 Julian year = 365.25 Earth days`) used to compute `siderealOrbitPeriodDays = siderealOrbitPeriodYears * 365.25`.
+  6. **JPL Small-Body Database (SBDB) API** (`https://ssd-api.jpl.nasa.gov/doc/sbdb.html`) and **JPL Small-Body
+     Orbital Elements** (`https://ssd.jpl.nasa.gov/sb/orbits.html`) — queried at build/authoring time (`GET
+     https://ssd-api.jpl.nasa.gov/sbdb.api?sstr=101955&phys-par=1&full-prec=1`, retrieved 2026-10-24, signature
+     version `1.3`) for asteroid **101955 Bennu (1999 RQ36)** (`SPK-ID 20101955`, Apollo near-Earth asteroid / PHA,
+     Orbit Solution `118`, Epoch `JD 2455562.5` = `2011-Jan-01.0 TDB`, J2000 ecliptic):
+     - `diameter = 0.48444 km` (±`0.00030 km`, Daly et al. 2020, *Sci. Adv.* 6, eabd3649); triaxial extent
+       `0.5047 × 0.4918 × 0.4567 km`. Because SBDB publishes effective diameter rather than a direct radius field,
+       `meanRadiusKm = 0.48444 / 2 = 0.24222 km` (`242.2 m`) is derived and labeled explicitly via
+       `radiusDerivationNote`.
+     - `rot_per = 4.296061 h` (±`0.000002 h`, Hergenrother et al. 2019, *Nat. Commun.* 10, 1291), stored in
+       `rotationPeriodHours`.
+     - `a = 1.126391025894812 AU`, `e = 0.2037450762416414`, `i = 6.03494377024794 deg`, `q = 0.8968944004459729 AU`
+       (`perihelionAu`), `ad = 1.355887651343651 AU` (`aphelionAu`), and `per = 436.6487281120201 d`
+       (`siderealOrbitPeriodDays`, with `siderealOrbitPeriodYears = 436.6487281120201 / 365.25 = 1.195479063961725 yr`).
+     - In the Overview scene, Bennu is placed on a compressed circular schematic guide (`orbitRadius = 7.6` between
+       Earth `6.9` and Mars `8.3`) and advances by `siderealOrbitPeriodDays` only; the UI explicitly discloses that
+       the scene ring does not depict Bennu's real eccentricity (`e = 0.20375`), inclination (`i = 6.0349 deg`), or
+       Earth-crossing geometry.
 
 ## 3. Internal data contract
 

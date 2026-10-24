@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  BENNU_MODEL,
   JULIAN_YEAR_DAYS,
   NEW_PLANET_TEXTURES,
   NEW_PLANET_TEXTURE_BYTES,
@@ -14,12 +15,13 @@ import {
   bodyPosition,
   bodyPositionAtDays,
   cameraPose,
+  kindLabel,
 } from '../bodies';
 
 describe('Solar System reference registry', () => {
-  it('contains exactly the Sun and eight planets with stable unique ids', () => {
-    expect(SOLAR_SYSTEM_BODIES).toHaveLength(9);
-    expect(new Set(SOLAR_SYSTEM_BODIES.map((body) => body.id)).size).toBe(9);
+  it('contains the Sun, eight planets, and 101955 Bennu exactly once with stable unique ids and preserved planet ordinals', () => {
+    expect(SOLAR_SYSTEM_BODIES).toHaveLength(10);
+    expect(new Set(SOLAR_SYSTEM_BODIES.map((body) => body.id)).size).toBe(10);
     expect(SOLAR_SYSTEM_BODIES.map((body) => body.name)).toEqual([
       'Sun',
       'Mercury',
@@ -30,10 +32,25 @@ describe('Solar System reference registry', () => {
       'Saturn',
       'Uranus',
       'Neptune',
+      '101955 Bennu',
     ]);
     expect(SOLAR_SYSTEM_BODIES.map((body) => body.orderFromSun)).toEqual([
-      0, 1, 2, 3, 4, 5, 6, 7, 8,
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      null,
     ]);
+
+    const bennuEntries = SOLAR_SYSTEM_BODIES.filter((body) => body.id === 'bennu');
+    expect(bennuEntries).toHaveLength(1);
+    expect(bennuEntries[0].kind).toBe('small-body');
+    expect(kindLabel(bennuEntries[0].kind)).toBe('Near-Earth asteroid (small body)');
   });
 
   it('ships the four new non-Earth textures from the official catalog', () => {
@@ -108,7 +125,9 @@ describe('Solar System reference registry', () => {
       neptune: 164.79132,
     };
 
-    for (const body of SOLAR_SYSTEM_BODIES.filter((item) => item.id !== 'sun')) {
+    for (const body of SOLAR_SYSTEM_BODIES.filter(
+      (item) => item.id !== 'sun' && item.kind !== 'small-body',
+    )) {
       const { facts } = body;
       expect(Number.isFinite(facts.meanRadiusKm)).toBe(true);
       expect(facts.meanRadiusKm).toBeGreaterThan(2000);
@@ -147,6 +166,41 @@ describe('Solar System reference registry', () => {
     expect(earth.facts.sources).toContain(SOLAR_SYSTEM_REFERENCE_SOURCES['nasa-nssdc-fact-sheet']);
   });
 
+  it('includes finite JPL SBDB physical and orbital facts for 101955 Bennu with explicit radius derivation and schematic disclosure', () => {
+    const bennu = bodyById('bennu');
+    const { facts } = bennu;
+
+    expect(bennu.kind).toBe('small-body');
+    expect(bennu.orderFromSun).toBeNull();
+    expect(bennu.model).toBe(BENNU_MODEL);
+    expect(bennu.orbitRadius).toBeGreaterThan(bodyById('earth').orbitRadius);
+    expect(bennu.orbitRadius).toBeLessThan(bodyById('mars').orbitRadius);
+
+    expect(facts.effectiveDiameterKm).toBe(0.48444);
+    expect(facts.meanRadiusKm).toBeCloseTo(0.24222, 10);
+    expect(facts.meanRadiusDerivedFrom).toMatch(/0\.48444 km \/ 2/i);
+    expect(facts.triaxialDimensionsKm).toBe('0.5047 × 0.4918 × 0.4567 km');
+    expect(facts.rotationPeriodHours).toBeCloseTo(4.296061, 6);
+
+    expect(facts.semiMajorAxisAu).toBeCloseTo(1.126391025894812, 12);
+    expect(facts.perihelionAu).toBeCloseTo(0.8968944004459729, 12);
+    expect(facts.aphelionAu).toBeCloseTo(1.355887651343651, 12);
+    expect(facts.siderealOrbitPeriodDays).toBeCloseTo(436.6487281120201, 9);
+    expect(facts.siderealOrbitPeriodYears).toBeCloseTo(
+      436.6487281120201 / JULIAN_YEAR_DAYS,
+      12,
+    );
+    expect(facts.eccentricity).toBeCloseTo(0.2037450762416414, 12);
+    expect(facts.inclinationDeg).toBeCloseTo(6.03494377024794, 12);
+
+    expect(facts.sources).toContain(SOLAR_SYSTEM_REFERENCE_SOURCES['jpl-sbdb-api']);
+    expect(facts.sources).toContain(SOLAR_SYSTEM_REFERENCE_SOURCES['jpl-sb-orbits']);
+    expect(facts.sources).toContain(SOLAR_SYSTEM_REFERENCE_SOURCES['jpl-astro-par']);
+    expect(facts.provenanceNote).toMatch(/solution 118/i);
+    expect(facts.provenanceNote).toMatch(/diameter \/ 2/i);
+    expect(facts.provenanceNote).toMatch(/compressed circular schematic guide/i);
+  });
+
   it('places bodies on display-only schematic guides and focuses the camera without physics', () => {
     expect(bodyPosition('sun')).toEqual([0, 0, 0]);
     expect(bodyPositionAtDays('sun', 250)).toEqual([0, 0, 0]);
@@ -167,5 +221,9 @@ describe('Solar System reference registry', () => {
 
     const focusedAtDays = cameraPose('body', 'jupiter', 180);
     expect(focusedAtDays.target).toEqual(bodyPositionAtDays('jupiter', 180));
+
+    const focusedBennu = cameraPose('body', 'bennu', 90);
+    expect(focusedBennu.target).toEqual(bodyPositionAtDays('bennu', 90));
+    expect(focusedBennu.position[1]).toBeGreaterThan(focusedBennu.target[1]);
   });
 });

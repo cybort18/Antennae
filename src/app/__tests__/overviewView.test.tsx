@@ -110,7 +110,7 @@ describe('Solar System Overview', () => {
       screen.getByRole('button', { name: 'Earth Orbit Lab' }).getAttribute('aria-pressed'),
     ).toBe('false');
 
-    // All nine reference bodies are present and selectable.
+    // All ten reference bodies (Sun, eight planets, and 101955 Bennu) are present and selectable.
     const bodySelector = within(screen.getByLabelText('Solar System bodies'));
     for (const name of [
       'Sun',
@@ -122,6 +122,7 @@ describe('Solar System Overview', () => {
       'Saturn',
       'Uranus',
       'Neptune',
+      '101955 Bennu',
     ]) {
       expect(bodySelector.getByRole('button', { name: new RegExp(`^${name}`) })).toBeTruthy();
     }
@@ -186,8 +187,50 @@ describe('Solar System Overview', () => {
     await user.click(screen.getByRole('button', { name: /^Neptune/ }));
     expect(screen.getAllByText(/not an observational map/i).length).toBeGreaterThan(0);
 
+    // Selecting 101955 Bennu shows JPL SBDB physical/orbital facts, explicit diameter/2 radius derivation,
+    // NASA VTAD 3D model link, and honest disclosure separating its circular schematic guide from its eccentric orbit.
+    await user.click(bodySelector.getByRole('button', { name: /^101955 Bennu/ }));
+    expect(viewport.dataset.selectedId).toBe('bennu');
+    expect(viewport.dataset.focusMode).toBe('body');
+    expect(screen.getByRole('heading', { name: '101955 Bennu' })).toBeTruthy();
+    expect(
+      screen.getByText('Between Earth and Mars (near-Earth asteroid; not a planet)'),
+    ).toBeTruthy();
+    expect(screen.getByText('Apollo near-Earth asteroid (NEO · PHA)')).toBeTruthy();
+    expect(
+      screen.getByText(
+        /0\.24222 km \(242\.2 m\) \(derived: 0\.48444 km diameter \/ 2\)/,
+      ),
+    ).toBeTruthy();
+    expect(screen.getByText('4.2961 h (synodic)')).toBeTruthy();
+    expect(screen.getByText('1.1264 AU')).toBeTruthy();
+    expect(screen.getByText('0.8969 AU / 1.3559 AU')).toBeTruthy();
+    expect(screen.getByText(/436\.65 Earth days \(1\.1955 Julian yr\)/)).toBeTruthy();
+    expect(screen.getByText('0.2037')).toBeTruthy();
+    expect(screen.getByText(/6\.03° \(J2000 ecliptic\)/)).toBeTruthy();
+    expect(
+      screen.getByText(
+        /Compressed circular schematic between Earth & Mars \(real eccentric\/inclined orbit not rendered\)/,
+      ),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole('link', { name: 'NASA 3D Resources 3D mesh (NASA VTAD)' }).getAttribute(
+        'href',
+      ),
+    ).toBe('https://science.nasa.gov/resource/bennu-3d-model/');
+    expect(
+      screen.getAllByRole('link', { name: 'JPL Small-Body Database (SBDB) API' })[0].getAttribute(
+        'href',
+      ),
+    ).toBe('https://ssd-api.jpl.nasa.gov/doc/sbdb.html');
+    expect(
+      screen.getAllByRole('link', { name: 'JPL Small-Body Orbital Elements' })[0].getAttribute(
+        'href',
+      ),
+    ).toBe('https://ssd.jpl.nasa.gov/sb/orbits.html');
+
     await user.click(screen.getByRole('button', { name: 'Overview view' }));
-    expect(viewport.dataset.selectedId).toBe('neptune');
+    expect(viewport.dataset.selectedId).toBe('bennu');
     expect(viewport.dataset.focusMode).toBe('overview');
   });
 
@@ -294,7 +337,7 @@ describe('Solar System Overview', () => {
     expect(screen.queryAllByRole('button', { name: 'Pause playback' })).toHaveLength(0);
   }, 20000);
 
-  it('keeps all nine projected labels visible at elapsedDays = 0 and deterministically suppresses overlapping lower-priority labels at conjunction times while keeping every body selectable', async () => {
+  it('keeps all ten projected labels visible at elapsedDays = 0 and deterministically suppresses overlapping lower-priority labels at conjunction times while keeping every body selectable', async () => {
     const projectOverviewCandidates = (
       width: number,
       height: number,
@@ -351,7 +394,7 @@ describe('Solar System Overview', () => {
       );
     }
 
-    // At elapsedDays = 0 on desktop viewports, all nine labels remain visible with zero overlaps.
+    // At elapsedDays = 0 on desktop viewports, all ten labels remain visible with zero overlaps.
     for (const [width, height] of [
       [1600, 862],
       [1280, 662],
@@ -360,7 +403,7 @@ describe('Solar System Overview', () => {
       const resolved = resolveSolarSystemLabelCollisions(candidates, 'sun');
       const visible = resolved.filter((item) => item.visible);
       const suppressed = resolved.filter((item) => item.suppressed);
-      expect(visible).toHaveLength(9);
+      expect(visible).toHaveLength(10);
       expect(suppressed).toHaveLength(0);
     }
 
@@ -426,7 +469,13 @@ describe('Solar System Overview', () => {
 
     // At mobile width (singleSelectedLabelOnly), only the selected body label is visible.
     const mobileCandidates = projectOverviewCandidates(390, 439, 180);
-    for (const selectedId of ['sun', 'mercury', 'mars', 'neptune'] as SolarSystemBodyId[]) {
+    for (const selectedId of [
+      'sun',
+      'mercury',
+      'mars',
+      'neptune',
+      'bennu',
+    ] as SolarSystemBodyId[]) {
       const mobileResolved = resolveSolarSystemLabelCollisions(
         mobileCandidates,
         selectedId,
@@ -435,7 +484,7 @@ describe('Solar System Overview', () => {
       expect(mobileResolved.filter((item) => item.visible).map((item) => item.id)).toEqual([
         selectedId,
       ]);
-      expect(mobileResolved.filter((item) => item.suppressed)).toHaveLength(8);
+      expect(mobileResolved.filter((item) => item.suppressed)).toHaveLength(9);
     }
 
     // Verify in the DOM that bodies whose projected labels are suppressed at 1825 d remain
@@ -457,5 +506,11 @@ describe('Solar System Overview', () => {
     );
     expect(screen.getByRole('heading', { name: 'Mercury' })).toBeTruthy();
     expect(screen.getByText('2439.4 km')).toBeTruthy();
+
+    await user.click(bodySelector.getByRole('button', { name: /^101955 Bennu/ }));
+    expect(screen.getByTestId('solar-system-viewport-stub').dataset.selectedId).toBe(
+      'bennu',
+    );
+    expect(screen.getByRole('heading', { name: '101955 Bennu' })).toBeTruthy();
   });
 });

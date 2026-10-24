@@ -51,11 +51,12 @@ describe('Solar System pure schematic motion', () => {
     }
   });
 
-  it('orders angular speeds inversely proportional to each planet sidereal orbital period', () => {
-    const planetOrder: SolarSystemBodyId[] = [
+  it('orders angular speeds inversely proportional to each body sidereal orbital period', () => {
+    const bodyOrderByPeriod: SolarSystemBodyId[] = [
       'mercury',
       'venus',
       'earth',
+      'bennu',
       'mars',
       'jupiter',
       'saturn',
@@ -63,9 +64,9 @@ describe('Solar System pure schematic motion', () => {
       'neptune',
     ];
 
-    for (let i = 0; i < planetOrder.length - 1; i += 1) {
-      const inner = planetOrder[i];
-      const outer = planetOrder[i + 1];
+    for (let i = 0; i < bodyOrderByPeriod.length - 1; i += 1) {
+      const inner = bodyOrderByPeriod[i];
+      const outer = bodyOrderByPeriod[i + 1];
       const innerSpeed = schematicAngularSpeedRadPerDay(inner);
       const outerSpeed = schematicAngularSpeedRadPerDay(outer);
       expect(innerSpeed).toBeGreaterThan(outerSpeed);

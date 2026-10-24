@@ -18,7 +18,7 @@ This file prevents an AI agent from turning a suggestion into an unreviewed requ
 | Toolchain | npm with React + TypeScript + Vite, Vitest for tests, oxlint from the Vite template. The physics core is framework-independent. The 3D viewport uses Three.js with React Three Fiber and Drei (OrbitControls/gizmo/camera only). | Decided 2026-10-18; 3D stack added 2026-10-19 |
 | First physics model | Two-body test particle orbiting a dominant Earth central body: km / s / kg units, Earth-centered inertial axes without an attached epoch, fixed-step kick-drift-kick leapfrog. | Implemented and tested 2026-10-18 |
 | Asset creation | No team member currently owns custom 3D asset creation; use a curated, individually license-checked external asset set where useful | User-provided context; the Phase 3.6 six-texture set is selected and documented 2026-10-21 |
-| Asset candidates | Six NASA texture files and one NASA GOES-R GLB are implemented: two Earth Observatory Blue Marble images, four NASA 3D Resources planetary maps, and the official GOES spacecraft model (render-only). Additional NASA 3D Resources, Solar System Scope, and Poly Haven items remain candidates for future assets | Current set implemented; future items require item-level review |
+| Asset candidates | Six NASA texture files and two NASA 3D GLBs are implemented: two Earth Observatory Blue Marble images, four NASA 3D Resources planetary maps, the official GOES spacecraft model (render-only in Earth Orbit Lab), and the official NASA VTAD 101955 Bennu asteroid model (render-only when focused in Solar System Overview). Additional NASA 3D Resources, Solar System Scope, and Poly Haven items remain candidates for future assets | Current set implemented; future items require item-level review |
 | Mission evaluation | One template, Design a Stable Circular Earth Orbit, evaluated from recorded engine samples with explicit PASS / FAIL / NOT EVALUABLE states. Target range 250–2,000 km, ±20 km tolerance, 200 km clearance, at least one target period, minimum 8 usable samples. Target is separate from initial conditions. | Implemented and tested 2026-10-21; additional templates and configurable thresholds open |
 
 ## Recommended defaults (verify against current repo)
@@ -38,6 +38,76 @@ This file prevents an AI agent from turning a suggestion into an unreviewed requ
 ## Decision log
 
 Entries are append-only: supersede an older decision with a newer dated entry instead of rewriting history.
+
+### 2026-10-24 — Phase 5 Step 3: Asteroid 101955 Bennu in Solar System Overview
+
+**Context.** After adding planetary reference facts, period-proportional schematic motion, and deterministic
+projected-label collision resolution, the Solar System Overview still lacked a selectable small body and asteroid
+3D surface representation. The owner requested adding Apollo near-Earth asteroid **101955 Bennu** to the Overview
+as a selectable, sourced small body using the official JPL Small-Body Database (SBDB) API for reference facts and
+the official lightweight NASA Science / VTAD Bennu 3D model (subject to a `< 5 MiB` asset gate), with a procedural
+rocky fallback, lazy focus-only model loading, and explicit scientific disclosure separating Bennu's real eccentric
+orbit from its circular schematic display ring.
+
+**Choices made.**
+
+1. **Sourced JPL SBDB physical and orbital reference facts.** `src/solarSystem/bodies.ts` adds `'bennu'` (`kind:
+   'small-body'`, `orderFromSun: null`) after the eight planets so planetary ordering (`orderFromSun: 1..8`) is
+   preserved unchanged. Reference values come from the official JPL Small-Body Database API
+   (`https://ssd-api.jpl.nasa.gov/sbdb.api?sstr=101955&phys-par=1&full-prec=1`, `SPK-ID 20101955`, Orbit Solution
+   `118`, Epoch `JD 2455562.5` = `2011-Jan-01.0 TDB`, J2000 ecliptic) and JPL Small-Body Orbital Elements
+   (`https://ssd.jpl.nasa.gov/sb/orbits.html`): `semiMajorAxisAu = 1.126391025894812 AU`,
+   `eccentricity = 0.2037450762416414`, `inclinationDeg = 6.03494377024794 deg`, `perihelionAu = 0.8968944004459729 AU`,
+   `aphelionAu = 1.355887651343651 AU`, `siderealOrbitPeriodDays = 436.6487281120201 d` (`1.195479063961725 Julian yr`),
+   and `rotationPeriodHours = 4.296061 h`. Because SBDB publishes effective diameter (`diameter = 0.48444 km`,
+   triaxial extent `0.5047 × 0.4918 × 0.4567 km`, Daly et al. 2020) rather than a direct radius field,
+   `meanRadiusKm = 0.48444 / 2 = 0.24222 km` (`242.2 m`) is derived and labeled explicitly via
+   `radiusDerivationNote`.
+2. **Official lightweight NASA Science / VTAD GLB passes the `< 5 MiB` asset gate.** The downloadable asset from
+   `https://science.nasa.gov/resource/bennu-3d-model/` (`Bennu_1_1.glb`) was inspected before bundling: it is a
+   self-contained glTF 2.0 binary (`glTF` magic header, version `2`, `859,980` bytes / ~`839.82 KiB` / ~`0.82 MiB`,
+   SHA-256 `B7740B53A77FF538082D26E7079510EF7810FC3DE9A5FF0FA316B393D2CF700E`) containing 1 mesh (1,419 vertices,
+   8,076 indices), 1 material, 1 embedded PNG texture, and 0 external URI dependencies. It is stored locally at
+   `public/assets/models/bennu.glb` and credited to NASA Visualization Technology Applications and Development
+   (VTAD) / NASA Science.
+3. **Focus-only lazy loading and procedural faceted rocky shape.** At the wide system view (`focusMode ===
+   'overview'`) or when another body is selected, `BennuAsteroidModel` renders a lightweight procedural faceted
+   rocky shape (`<icosahedronGeometry args={[0.22, 1]} />` with `flatShading`) and makes zero requests for
+   `/assets/models/bennu.glb`. Only when `selectedId === 'bennu' && focusMode === 'body'` does `loadBennuModelScene`
+   fetch and normalize `bennu.glb`. If the GLB fails to load or parse, the component keeps the procedural rocky
+   fallback, reports `Bennu mesh unavailable · procedural rocky fallback` in both the viewport badge and the
+   detail card, and throws no unhandled error. Cloned materials and source geometry/material/texture GPU resources
+   are disposed on unmount.
+4. **Explicit schematic vs. physical orbit disclosure.** Bennu sits on a compressed circular guide (`orbitRadius =
+   7.6` scene units between Earth `6.9` and Mars `8.3`, `displayRadius = 0.22`, `phaseRadians = 1.48`) and advances
+   with period-proportional schematic motion using its `436.6487 d` sidereal period. Both the detail card and
+   provenance note state explicitly that the circular guide is for schematic legibility only and does not represent
+   Bennu's real eccentric (`e = 0.20375`), inclined (`i = 6.0349 deg`), Earth-crossing Apollo orbit (`q = 0.89689 AU`,
+   `Q = 1.35589 AU`).
+5. **10-body deterministic label collision priority.** `src/scene/solarSystemLabels.ts` adds `'bennu'` at the end of
+   `DEFAULT_LABEL_PRIORITY_ORDER` with fallback dimensions `{ width: 108, height: 20 }`. With `phaseRadians = 1.48`,
+   all 10 labels are visible with zero overlaps at `elapsedDays = 0` on desktop viewports, and selecting Bennu
+   promotes its label to highest priority alongside the Sun.
+
+**Alternatives considered.** Bundling the NASA SVS 5069 laser-altimetry meshes (rejected: multi-hundred-MB offline
+research meshes far exceed web constraints); loading `bennu.glb` at initial page load (rejected: unnecessary startup
+payload when a tiny faceted icosahedron suffices at whole-system scale); rendering an elliptical inclined 3D ring
+for Bennu inside the compressed schematic layout (rejected: mixing true eccentricity/inclination with compressed
+non-linear planet radii would falsely imply geometric scale accuracy where Earth's schematic radius is `6.9` scene
+units); shifting Mars–Neptune `orderFromSun` indices to `5..9` (rejected: Bennu is a near-Earth asteroid, not the
+fourth planet, so `orderFromSun` is `null` and planets retain `1..8`).
+
+**Consequences and follow-ups.** Total local visual assets increase by `859,980` bytes (~`0.82 MiB`) to
+`10,972,114` bytes (~`10.46 MiB`) across eight files, with zero increase in initial startup network requests. The
+Earth-centered two-body physics engine (`src/simulation/`), Earth Orbit Lab, and Mission Designer remain untouched.
+
+**Tests added.** `src/scene/__tests__/bennuModel.test.ts` (GLB header/byte size/SHA-256/self-contained buffers,
+focus-only association, normalization/centering, error fallback, GPU resource disposal, and simulation isolation)
+plus expanded assertions in `src/solarSystem/__tests__/bodies.test.ts`,
+`src/solarSystem/__tests__/schematicMotion.test.ts`, and `src/app/__tests__/overviewView.test.tsx`.
+
+**Docs updated.** `README.md`, `PRD.md`, `docs/ASSETS.md`, `docs/DATA_SOURCES.md`, `docs/ARCHITECTURE.md`,
+`docs/DECISIONS.md`.
 
 ### 2026-10-23 — Phase 5 Step 2: Solar System reference facts and illustrative schematic motion
 

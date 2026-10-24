@@ -40,7 +40,7 @@ Simulation Results & Mission Evaluator
 
 ### UI and scene renderer
 
-The rendering layer may load curated third-party meshes and textures. Before any such asset is shipped, review its license and usage terms, record the attribution that license requires, and keep physical properties and scenario state independent from render geometry and display scale. Asset-load failures must degrade to a placeholder rather than alter or block the simulation state. The current build loads six local NASA textures (Earth surface and static clouds plus four planetary maps in the Overview) with procedural fallbacks, plus one local NASA GOES GLB with a marker fallback. The GOES path is a specific reference-only loader; there is no general model catalogue or asset pipeline.
+The rendering layer may load curated third-party meshes and textures. Before any such asset is shipped, review its license and usage terms, record the attribution that license requires, and keep physical properties and scenario state independent from render geometry and display scale. Asset-load failures must degrade to a placeholder rather than alter or block the simulation state. The current build loads six local NASA textures (Earth surface and static clouds plus four planetary maps in the Overview) with procedural fallbacks, one local NASA GOES GLB with a marker fallback in the Earth Orbit Lab, and one local NASA VTAD 101955 Bennu GLB with a procedural faceted rocky fallback when Bennu is focused in the Solar System Overview. Each GLB path is a specific, lazily loaded reference/display loader; there is no general model catalogue or asset pipeline.
 
 
 Render scenario state, labels, object selection, trajectories, vector overlays, and controls. It must not independently calculate authoritative physics. Visual scaling must not mutate physical values.
@@ -88,12 +88,12 @@ src/
   data/            # Cached JPL Horizons fixture, parser, provenance, reference preset
   comparison/      # Immutable run records, candidate runs, altitude series, shared-sample differences
   results/         # Display metrics and formatting derived from recorded samples
-  solarSystem/     # Display-only Solar System registry: bodies, schematic layout, camera poses
+  solarSystem/     # Display-only Solar System registry: bodies (Sun, 8 planets, Bennu), schematic layout, camera poses
   app/             # Workspace panels, playback timeline, comparison chart, mission UI, Overview screen
-  scene/           # 3D viewports (display only, one-way km -> scene-unit transform) and GOES mesh
+  scene/           # 3D viewports (display only, one-way km -> scene-unit transform), GOES & Bennu meshes
   components/      # Presentation-only UI primitives (Panel, Button, Chip)
   test/            # Shared test setup and DOM test utilities
-public/assets/     # Locally served visual assets (NASA Earth/planetary textures and GOES GLB)
+public/assets/     # Locally served visual assets (NASA Earth/planetary textures, GOES & Bennu GLBs)
 docs/              # Canonical technical documentation
 ```
 
@@ -214,7 +214,7 @@ export type MissionEvaluation = {
 - If AI fails, retain the simulation and results UI.
 - If a mission metric is not represented by the current model, say unavailable and do not guess.
 
-## 8. Implementation status in this repository (2026-10-21)
+## 8. Implementation status in this repository (2026-10-24)
 
 ### Implemented
 
@@ -225,9 +225,10 @@ The UI, data, comparison, scenario, result, scene, solar-system, and mission mod
 test files, including DOM interaction tests that drive the real component tree
 (`src/app/__tests__/workspace.test.tsx`, `src/app/__tests__/comparisonView.test.tsx`,
 `src/app/__tests__/referencePresetView.test.tsx`, `src/app/__tests__/overviewView.test.tsx`,
-`src/app/__tests__/missionView.test.tsx`). The full suite is 27 files / 247 passing tests; the physics core
+`src/app/__tests__/missionView.test.tsx`). The full suite is 29 files / 262 passing tests; the physics core
 accounts for 8 files / 72 tests. The WebGL viewports are replaced by stubs in those tests because jsdom has no
-WebGL context; the rendered scenes and the GOES GLB load/fallback were verified separately in a real browser.
+WebGL context; the rendered scenes and the GOES and Bennu GLB load/fallback paths were verified separately in a
+real browser.
 
 `src/missions/` — the framework-independent mission evaluator. It imports the simulation's documented
 constants and derived-metric helpers, accepts a target altitude and a `SimulationResult`, and returns a
@@ -274,9 +275,10 @@ scripts `dev`, `build`, `typecheck`, `lint`, `test`, `test:watch`, `preview`.
 | `app/MissionDesignerPanel.tsx` | Task-first target/initial-condition controls, Run Mission action, outcome, criteria, sample-derived metrics, disclosures |
 | `missions/circularOrbitMission.ts` | Circular-speed/period formulas, target validation, recorded-sample evaluation, and NOT EVALUABLE rules |
 | `app/SolarSystemOverview.tsx` | Default reference screen: body selector, selected-body physical facts & provenance, opt-in schematic motion strip, camera reset, scale/source disclosures |
-| `solarSystem/bodies.ts` | Display-only Sun + eight-planet registry, sourced physical reference facts (`SolarSystemPhysicalFacts`), schematic positions, camera poses, and local texture metadata |
+| `solarSystem/bodies.ts` | Display-only Sun + eight-planet + 101955 Bennu registry, sourced physical reference facts (`SolarSystemPhysicalFacts`), schematic positions, camera poses, local texture metadata, and Bennu 3D model metadata (`BENNU_MODEL`) |
 | `solarSystem/schematicMotion.ts` | Pure, period-proportional schematic motion helpers (`theta_i(days) = phaseRadians_i + 2*pi * elapsedDays / siderealOrbitPeriodDays_i`) and deterministic day stepping/clamping |
-| `scene/SolarSystemViewport.tsx` | Overview canvas, procedural orbit guides, DOM labels, selection/focus camera tracking schematic positions, texture fallbacks, credit overlay |
+| `scene/SolarSystemViewport.tsx`, `scene/solarSystemLabels.ts` | Overview canvas, procedural orbit guides, deterministic 10-body screen-space collision-resolved DOM labels, selection/focus camera tracking schematic positions, texture/mesh fallbacks, credit overlay |
+| `scene/bennuModel.ts`, `scene/BennuAsteroidModel.tsx` | Bennu asset metadata/association and lazy, focus-only GLB loading with procedural faceted rocky shape at wide system view and as a load failure fallback |
 | `scene/useLocalTexture.ts`, `scene/planetSurface.ts` | Shared local-texture loading/disposal and texture-or-fallback material state |
 | `scene/spacecraftModels.ts`, `scene/GoesSpacecraftModel.tsx` | GOES-16 asset metadata/provenance and lazy, render-only GLB loading with marker fallback |
 | `app/*.tsx` | Top bar (with record switcher), object browser, inspector, results, timeline, notices, status banners |

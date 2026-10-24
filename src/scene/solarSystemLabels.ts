@@ -14,8 +14,8 @@ export const COMPACT_LABEL_VIEWPORT_MAX_WIDTH_PX = 620;
 /**
  * Deterministic label priority order when a body is not the active selection.
  * The selected body always takes top priority (rank 0), followed by the Sun,
- * Earth, the four outer giant planets, and the inner terrestrial planets from
- * outer (less crowded) to inner (most crowded near the Sun).
+ * Earth, the four outer giant planets, the inner terrestrial planets from
+ * outer (less crowded) to inner (most crowded near the Sun), and small bodies.
  */
 export const DEFAULT_LABEL_PRIORITY_ORDER: readonly SolarSystemBodyId[] = [
   'sun',
@@ -27,6 +27,7 @@ export const DEFAULT_LABEL_PRIORITY_ORDER: readonly SolarSystemBodyId[] = [
   'mars',
   'venus',
   'mercury',
+  'bennu',
 ];
 
 export const FALLBACK_LABEL_DIMENSIONS: Readonly<
@@ -41,6 +42,7 @@ export const FALLBACK_LABEL_DIMENSIONS: Readonly<
   saturn: { width: 65, height: 20 },
   uranus: { width: 65, height: 20 },
   neptune: { width: 71, height: 20 },
+  bennu: { width: 108, height: 20 },
 };
 
 export type ProjectedLabelCandidate = {

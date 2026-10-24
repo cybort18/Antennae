@@ -22,9 +22,33 @@ export type SolarSystemBodyId =
   | 'jupiter'
   | 'saturn'
   | 'uranus'
-  | 'neptune';
+  | 'neptune'
+  | 'bennu';
 
-export type SolarSystemBodyKind = 'star' | 'terrestrial' | 'gas-giant' | 'ice-giant';
+export type SolarSystemBodyKind =
+  | 'star'
+  | 'terrestrial'
+  | 'gas-giant'
+  | 'ice-giant'
+  | 'small-body';
+
+export type SolarSystemModelAsset = {
+  id: 'bennu';
+  label: string;
+  localPath: string;
+  sourcePageUrl: string;
+  fileUrl: string;
+  catalogUrl: string;
+  usageUrl: string;
+  sourceLabel: 'NASA 3D Resources';
+  credit: string;
+  creditDetail: string;
+  format: 'glTF 2.0 binary (.glb)';
+  bytes: number;
+  sha256: string;
+  retrievedAt: string;
+  renderNote: string;
+};
 
 export type SolarSystemTexture = {
   localPath: string;
@@ -62,7 +86,9 @@ export type SolarSystemReferenceSourceId =
   | 'jpl-approx-pos'
   | 'jpl-astro-par'
   | 'nasa-nssdc-fact-sheet'
-  | 'nasa-sun-facts';
+  | 'nasa-sun-facts'
+  | 'jpl-sbdb-api'
+  | 'jpl-sb-orbits';
 
 export type SolarSystemReferenceSource = {
   id: SolarSystemReferenceSourceId;
@@ -81,10 +107,22 @@ export type SolarSystemReferenceSource = {
  * explicitly `null` (not applicable).
  */
 export type SolarSystemPhysicalFacts = {
-  /** Volumetric mean radius in kilometres. */
+  /** Volumetric or effective mean radius in kilometres. */
   meanRadiusKm: number;
+  /** Optional explicit note when mean radius is derived from effective diameter. */
+  meanRadiusDerivedFrom?: string;
+  /** Optional effective diameter in kilometres (supplied for small bodies by JPL SBDB). */
+  effectiveDiameterKm?: number;
+  /** Optional triaxial dimensions string from JPL SBDB. */
+  triaxialDimensionsKm?: string;
+  /** Optional synodic rotation period in hours from JPL SBDB. */
+  rotationPeriodHours?: number;
   /** Heliocentric semi-major axis in astronomical units; null for the Sun. */
   semiMajorAxisAu: number | null;
+  /** Optional perihelion distance in astronomical units from JPL SBDB. */
+  perihelionAu?: number;
+  /** Optional aphelion distance in astronomical units from JPL SBDB. */
+  aphelionAu?: number;
   /** Sidereal orbital period in Julian years (365.25 days); null for the Sun. */
   siderealOrbitPeriodYears: number | null;
   /** Sidereal orbital period in Earth days (siderealOrbitPeriodYears * 365.25); null for the Sun. */
@@ -93,6 +131,10 @@ export type SolarSystemPhysicalFacts = {
   eccentricity: number | null;
   /** Orbital inclination to the J2000 ecliptic in degrees; null for the Sun. */
   inclinationDeg: number | null;
+  /** Optional small-body orbit classification label (e.g., Apollo near-Earth asteroid). */
+  orbitClassLabel?: string;
+  /** Optional orbital solution and epoch context for osculating small-body elements. */
+  orbitSolutionEpoch?: string;
   /** Provenance sources for the physical and orbital parameters above. */
   sources: readonly SolarSystemReferenceSource[];
   /** Optional field-level provenance or approximation note (e.g., Earth vs. EM Bary). */
@@ -103,19 +145,23 @@ export type SolarSystemBody = {
   id: SolarSystemBodyId;
   name: string;
   kind: SolarSystemBodyKind;
-  /** Position in the documented order from the Sun; the Sun is 0. */
-  orderFromSun: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+  /**
+   * Position in the documented planet order from the Sun (1..8); the Sun is 0,
+   * and small bodies are `null` so planet ordinals are never shifted.
+   */
+  orderFromSun: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | null;
   /** Display-only distance from the Sun in scene units. Not a physical value. */
   orbitRadius: number;
-  /** Display-only sphere radius in scene units. Not a physical value. */
+  /** Display-only sphere/mesh radius in scene units. Not a physical value. */
   displayRadius: number;
   /** Display-only static composition angle in radians. Not an ephemeris. */
   phaseRadians: number;
   /** Visible dot/label colour, also used by the selector. */
   accentColor: string;
-  /** Colour shown when the texture is absent or fails to load. */
+  /** Colour shown when the texture or 3D mesh is absent or fails to load. */
   fallbackColor: string;
   texture?: SolarSystemTexture;
+  model?: SolarSystemModelAsset;
   ring?: SolarSystemRing;
   /** Static physical reference facts with official NASA/JPL provenance. */
   facts: SolarSystemPhysicalFacts;
@@ -160,6 +206,20 @@ export const SOLAR_SYSTEM_REFERENCE_SOURCES: Readonly<
     label: 'NASA Sun Facts',
     url: 'https://science.nasa.gov/sun/facts/',
     scopeNote: 'Approximate solar volumetric mean radius (~695,700 km; cross-referenced with NASA/NSSDC).',
+  },
+  'jpl-sbdb-api': {
+    id: 'jpl-sbdb-api',
+    label: 'JPL Small-Body Database (SBDB) API',
+    url: 'https://ssd-api.jpl.nasa.gov/doc/sbdb.html',
+    scopeNote:
+      'Official JPL SBDB record for 101955 Bennu (SPK-ID 20101955, orbit solution 118, epoch JD 2455562.5 TDB; effective diameter 0.48444 km from Daly et al. 2020 and rotation period 4.296061 h from Hergenrother et al. 2019).',
+  },
+  'jpl-sb-orbits': {
+    id: 'jpl-sb-orbits',
+    label: 'JPL Small-Body Orbital Elements',
+    url: 'https://ssd.jpl.nasa.gov/sb/orbits.html',
+    scopeNote:
+      'Heliocentric J2000 ecliptic osculating orbital element definitions and conventions for small bodies.',
   },
 };
 
@@ -282,6 +342,39 @@ const SUN_SOURCES: readonly SolarSystemReferenceSource[] = [
   SOLAR_SYSTEM_REFERENCE_SOURCES['nasa-sun-facts'],
   SOLAR_SYSTEM_REFERENCE_SOURCES['nasa-nssdc-fact-sheet'],
 ];
+
+const BENNU_SOURCES: readonly SolarSystemReferenceSource[] = [
+  SOLAR_SYSTEM_REFERENCE_SOURCES['jpl-sbdb-api'],
+  SOLAR_SYSTEM_REFERENCE_SOURCES['jpl-sb-orbits'],
+  SOLAR_SYSTEM_REFERENCE_SOURCES['jpl-astro-par'],
+];
+
+/**
+ * Official lightweight NASA Science 3D model for 101955 Bennu.
+ * Downloaded from the NASA Science 3D resource page (NASA VTAD), verified as
+ * self-contained glTF 2.0 binary (.glb), and loaded lazily only when Bennu is
+ * selected and focused in the Overview.
+ */
+export const BENNU_MODEL: SolarSystemModelAsset = {
+  id: 'bennu',
+  label: '101955 Bennu 3D model',
+  localPath: '/assets/models/bennu.glb',
+  sourcePageUrl: 'https://science.nasa.gov/resource/bennu-3d-model/',
+  fileUrl:
+    'https://assets.science.nasa.gov/content/dam/science/psd/solar/2023/09/b/Bennu_1_1.glb',
+  catalogUrl: 'https://science.nasa.gov/3d-resources/',
+  usageUrl: 'https://www.nasa.gov/nasa-brand-center/images-and-media/',
+  sourceLabel: 'NASA 3D Resources',
+  credit: 'NASA Visualization Technology Applications and Development (VTAD)',
+  creditDetail:
+    'Official NASA Science 3D resource page for asteroid 101955 Bennu, credited to NASA Visualization Technology Applications and Development (VTAD). High-resolution scientific shape models from NASA SVS (https://svs.gsfc.nasa.gov/5069) are not bundled due to multi-hundred-megabyte size.',
+  format: 'glTF 2.0 binary (.glb)',
+  bytes: 859_980,
+  sha256: 'B7740B53A77FF538082D26E7079510EF7810FC3DE9A5FF0FA316B393D2CF700E',
+  retrievedAt: '2026-10-24',
+  renderNote:
+    'Render-only mesh loaded lazily when 101955 Bennu is selected and focused. Apparent size is exaggerated for visual legibility and does not represent physical or schematic scale. At the wide overview or if the mesh cannot load, a procedural faceted rocky shape is shown.',
+};
 
 export const SOLAR_SYSTEM_BODIES: readonly SolarSystemBody[] = [
   {
@@ -489,6 +582,41 @@ export const SOLAR_SYSTEM_BODIES: readonly SolarSystemBody[] = [
     },
     description: 'The outermost of the eight planets; an ice giant.',
   },
+  {
+    id: 'bennu',
+    name: '101955 Bennu',
+    kind: 'small-body',
+    orderFromSun: null,
+    orbitRadius: 7.6,
+    displayRadius: 0.22,
+    phaseRadians: 1.48,
+    accentColor: '#b7a99a',
+    fallbackColor: '#7a7067',
+    model: BENNU_MODEL,
+    facts: {
+      meanRadiusKm: 0.48444 / 2,
+      meanRadiusDerivedFrom:
+        'Derived as half of SBDB effective body diameter (0.48444 km / 2 = 0.24222 km; Daly et al. 2020)',
+      effectiveDiameterKm: 0.48444,
+      triaxialDimensionsKm: '0.5047 × 0.4918 × 0.4567 km',
+      rotationPeriodHours: 4.296061,
+      semiMajorAxisAu: 1.126391025894812,
+      perihelionAu: 0.8968944004459729,
+      aphelionAu: 1.355887651343651,
+      siderealOrbitPeriodDays: 436.6487281120201,
+      siderealOrbitPeriodYears: 436.6487281120201 / JULIAN_YEAR_DAYS,
+      eccentricity: 0.2037450762416414,
+      inclinationDeg: 6.03494377024794,
+      orbitClassLabel: 'Apollo near-Earth asteroid (NEO · PHA)',
+      orbitSolutionEpoch:
+        'JPL SBDB solution 118 · Epoch JD 2455562.5 TDB (J2000 ecliptic)',
+      sources: BENNU_SOURCES,
+      provenanceNote:
+        'JPL Small-Body Database (SBDB) record for 101955 Bennu (1999 RQ36), SPK-ID 20101955, orbit solution 118 (epoch JD 2455562.5 TDB, J2000 ecliptic). SBDB supplies effective body diameter 0.48444 km (±0.00030 km; Daly et al. 2020) rather than mean radius directly, so mean radius (0.24222 km) is derived as diameter / 2. Although Bennu follows an eccentric (e = 0.2037), inclined (i = 6.03°) Earth-crossing Apollo orbit (q = 0.8969 AU, Q = 1.3559 AU), the Overview renders a compressed circular schematic guide between Earth and Mars at Bennu’s sidereal angular rate; it does not render the true ellipse, inclination, or dated ephemeris.',
+    },
+    description:
+      'A carbonaceous B-type Apollo near-Earth asteroid (1999 RQ36) and target of NASA’s OSIRIS-REx sample-return mission. Its semi-major axis (~1.126 AU) lies between Earth and Mars, though its eccentric orbit crosses Earth’s distance.',
+  },
 ] as const;
 
 export const SOLAR_SYSTEM_BODY_BY_ID: Readonly<
@@ -511,6 +639,8 @@ export function kindLabel(kind: SolarSystemBodyKind): string {
       return 'Gas giant';
     case 'ice-giant':
       return 'Ice giant';
+    case 'small-body':
+      return 'Near-Earth asteroid (small body)';
   }
 }
 
@@ -590,7 +720,10 @@ export function cameraPose(
 
   const body = bodyById(selectedId);
   const target = bodyPositionAtDays(selectedId, elapsedDays);
-  const distance = 1.5 + body.displayRadius * 6.2;
+  const distance =
+    body.kind === 'small-body'
+      ? 0.95 + body.displayRadius * 4.5
+      : 1.5 + body.displayRadius * 6.2;
   const length = Math.hypot(...FOCUS_DIRECTION);
   const direction: [number, number, number] = [
     FOCUS_DIRECTION[0] / length,

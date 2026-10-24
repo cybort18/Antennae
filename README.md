@@ -1,14 +1,14 @@
 # Antennae — Space Sandbox
 
 Antennae is a browser-based educational space-physics sandbox. It opens on a schematic **Solar System
-Overview** with the Sun and eight planets, then switches to an **Earth Orbit Lab** that simulates a
-massless test particle orbiting Earth under simplified two-body point-mass gravity, draws the trajectory
-the engine actually recorded in a 3D workspace, replays those samples as a timeline, and compares a
-baseline run with a modified candidate run through a computed altitude-versus-time chart. A third surface,
-the **Mission Designer**, turns the same recorded runs into an objective-driven result for one circular
-Earth-orbit template. The Lab also loads one cached JPL Horizons reference state for GOES-16 with visible
-provenance and runs it as a clearly labelled hypothetical two-body initial condition; a locally served,
-render-only NASA GOES spacecraft mesh marks that reference when it is displayed.
+Overview** with the Sun, eight planets, and near-Earth asteroid **101955 Bennu**, then switches to an
+**Earth Orbit Lab** that simulates a massless test particle orbiting Earth under simplified two-body point-mass
+gravity, draws the trajectory the engine actually recorded in a 3D workspace, replays those samples as a
+timeline, and compares a baseline run with a modified candidate run through a computed altitude-versus-time
+chart. A third surface, the **Mission Designer**, turns the same recorded runs into an objective-driven result
+for one circular Earth-orbit template. The Lab also loads one cached JPL Horizons reference state for GOES-16
+with visible provenance and runs it as a clearly labelled hypothetical two-body initial condition; a locally
+served, render-only NASA GOES spacecraft mesh marks that reference when it is displayed.
 
 It is a learning and demonstration tool. It is **not** flight software, a navigation tool, or an
 impact-prediction service. The Overview is a schematic reference visualization with opt-in,
@@ -16,18 +16,23 @@ period-proportional illustrative motion, not a planetary dynamics model or a dat
 
 ## What works today
 
-- **Solar System Overview** (`src/solarSystem/`, `src/scene/SolarSystemViewport.tsx`): the default landing
-  mode. It shows the Sun and eight planets in a compressed schematic layout with a body list, projected DOM
-  labels, selectable bodies, sourced physical reference facts (volumetric mean radius, semi-major axis,
-  sidereal orbital period in Earth days and Julian years, eccentricity, and inclination with official
-  NASA/JPL source links), camera focus, a whole-system reset, and an opt-in **Illustrative Schematic Motion**
-  control strip (Reset, Play/Pause, ±10 Earth-day steps, 0–3,650 Earth-day scrubber, and 10 / 60 / 365 d/s
-  rates). Four non-Earth textures (Mars, Jupiter,
-  Venus, Neptune) are served locally from NASA 3D Resources; the Sun, Mercury, Saturn, and Uranus use
-  procedural display materials, and Saturn's rings are procedural geometry. The screen states that sizes,
-  distances, and positions are compressed and illustrative, and it computes no planetary dynamics. Switching
-  among the Overview, Earth Orbit Lab, and Mission Designer is reversible; it pauses schematic motion while
-  preserving elapsed schematic days and does not clear the shared baseline, candidate, draft, or playback records.
+- **Solar System Overview** (`src/solarSystem/`, `src/scene/SolarSystemViewport.tsx`, `src/scene/BennuAsteroidModel.tsx`):
+  the default landing mode. It shows the Sun, eight planets, and Apollo near-Earth asteroid **101955 Bennu** in a
+  compressed schematic layout with a body list, deterministic 10-body collision-resolved projected DOM labels,
+  selectable bodies, sourced physical reference facts (volumetric or derived mean radius, semi-major axis,
+  sidereal orbital period in Earth days and Julian years, eccentricity, inclination, and—for Bennu—synodic
+  rotation period and perihelion/aphelion distances with official NASA/JPL source links), camera focus, a
+  whole-system reset, and an opt-in **Illustrative Schematic Motion** control strip (Reset, Play/Pause, ±10
+  Earth-day steps, 0–3,650 Earth-day scrubber, and 10 / 60 / 365 d/s rates). Four non-Earth textures (Mars,
+  Jupiter, Venus, Neptune) are served locally from NASA 3D Resources; the Sun, Mercury, Saturn, and Uranus use
+  procedural display materials, and Saturn's rings are procedural geometry. Bennu uses a lightweight procedural
+  faceted rocky shape at the wide system view and lazily loads an official NASA Visualization Technology
+  Applications and Development (VTAD) 3D GLB mesh only when Bennu is selected and focused, falling back to the
+  procedural rocky shape if the mesh cannot load. The screen states that sizes, distances, and positions are
+  compressed and illustrative—including separating Bennu's circular schematic display guide from its real
+  eccentric, inclined Apollo orbit—and it computes no planetary or asteroid dynamics. Switching among the
+  Overview, Earth Orbit Lab, and Mission Designer is reversible; it pauses schematic motion while preserving
+  elapsed schematic days and does not clear the shared baseline, candidate, draft, or playback records.
 - **Deterministic two-body physics core** (`src/simulation/`), framework-independent TypeScript: point-mass
   gravity, fixed-step kick-drift-kick leapfrog integration, input validation, stop conditions, warnings, and
   byte-identical output for identical input.
@@ -94,10 +99,12 @@ The Solar System Overview is a **separate schematic reference view**. Its orbit 
 only; body sizes, orbit spacing, and initial phase angles are display composition values in scene units.
 They are not physical radii, distances, orbital elements, dates, or current positions, and they are never
 passed into the Earth Orbit Lab, Mission Designer, or physics engine. Its opt-in schematic motion advances
-planets along their compressed circular guides at angular rates inversely proportional to their sidereal
-orbital periods (`theta_i(days) = phaseRadians_i + 2*pi * elapsedDays / siderealOrbitPeriodDays_i`); it is
-not a computed ephemeris or heliocentric dynamics model, and it has no weather or telemetry. Focusing a
-body changes the camera only and tracks that body's schematic display position.
+the eight planets and asteroid 101955 Bennu along their compressed circular guides at angular rates inversely
+proportional to their sidereal orbital periods (`theta_i(days) = phaseRadians_i + 2*pi * elapsedDays / siderealOrbitPeriodDays_i`);
+for Bennu, the circular guide between Earth and Mars is a schematic display path only, while its real eccentric
+Apollo orbit (`a = 1.1264 AU`, `e = 0.20375`, `i = 6.0349 deg`, `q = 0.89689 AU`, `Q = 1.35589 AU`) is disclosed
+in the reference panel. It is not a computed ephemeris or heliocentric dynamics model, and it has no weather or
+telemetry. Focusing a body changes the camera only and tracks that body's schematic display position.
 
 The starting preset is an explicit synthetic idealisation, **not** NASA/JPL observational data. A second,
 opt-in preset is a cached JPL Horizons state vector for GOES-16. Its initial vector is source data, but the
@@ -117,8 +124,9 @@ about a real spacecraft or a certified orbit.
 
 The application uses six locally served NASA display images: two Earth Observatory Blue Marble images for
 the Earth Orbit Lab and the Overview Earth, and four NASA 3D Resources planetary maps for Mars, Jupiter,
-Venus, and Neptune in the Overview. It also ships one local NASA GOES spacecraft GLB for the GOES-16
-reference view. They are **display assets only**: their pixels, geometry, materials, cloud patterns, and
+Venus, and Neptune in the Overview. It also ships two local NASA 3D GLB models: one GOES spacecraft GLB for the
+GOES-16 reference view in the Earth Orbit Lab, and one asteroid 101955 Bennu GLB for focused inspection in the
+Solar System Overview. They are **display assets only**: their pixels, geometry, materials, cloud patterns, and
 apparent weather do not define mass, radius, rotation, atmosphere, orbit, or any simulation state. All
 files are bundled with the app and served from its own origin; the app makes no third-party or provider
 asset request at runtime.
@@ -132,15 +140,19 @@ asset request at runtime.
 | Venus surface | `public/assets/planets/venus.jpg` (1440 × 720, 1,166,974 bytes) | [`Venus.jpg`](https://assets.science.nasa.gov/content/dam/science/cds/3d/resources/image/venus/Venus.jpg), from [NASA 3D Resources: Venus](https://science.nasa.gov/3d-resources/venus/) | NASA/JPL-Caltech, inferred from the JPL/Caltech planetary-map database; the source page lists no separate credit line. Stitched from Magellan radar imagery with gaps filled by the published global texture. This is a radar-derived surface map, **not** a natural-colour cloud view. NASA content; use consistent with the NASA Images and Media Usage Guidelines. |
 | Neptune surface | `public/assets/planets/neptune.jpg` (720 × 360, 210,528 bytes) | [`Neptune.jpg`](https://assets.science.nasa.gov/content/dam/science/cds/3d/resources/image/neptune/Neptune.jpg), from [NASA 3D Resources: Neptune](https://science.nasa.gov/3d-resources/neptune/) | Don Davis & JPL/Caltech. A fictional cloud-feature texture created for visualization; **not** an observational map. NASA content; use consistent with the NASA Images and Media Usage Guidelines. |
 | GOES spacecraft mesh (render only) | `public/assets/models/goes-r.glb` (glTF 2.0 binary, 6,439,892 bytes; SHA-256 `C3549A276B7899253C60E82B0B24A3CFFB6A39E0DAD1A8C7F30A73E8DCEB6398`) | [NASA GOES Spacecraft 3D Model](https://science.nasa.gov/mission/goes-spacecraft-3d-model/); file: [`GOES-R.glb`](https://assets.science.nasa.gov/content/dam/science/missions/goes/spacecraft/3dmodel/GOES-R.glb) | NASA GOES Program / NASA Science. The page credits Lockheed Martin for labeled GOES-U spacecraft renderings; it does not publish a separate creator line or embedded copyright for the downloadable GLB. NASA 3D Resources states its assets are free and without copyright. Use consistent with the [NASA Images and Media Usage Guidelines](https://www.nasa.gov/nasa-brand-center/images-and-media/). No NASA insignia or logo is used. **Render-only:** the mesh adds no mass, attitude, thrust, fuel, or dynamics and does not change the simulated trajectory. |
+| Asteroid 101955 Bennu mesh (render only) | `public/assets/models/bennu.glb` (glTF 2.0 binary, 859,980 bytes; SHA-256 `B7740B53A77FF538082D26E7079510EF7810FC3DE9A5FF0FA316B393D2CF700E`) | [NASA Science — Bennu 3D Model](https://science.nasa.gov/resource/bennu-3d-model/); file: [`Bennu_1_1.glb`](https://assets.science.nasa.gov/content/dam/science/psd/solar/2023/09/b/Bennu_1_1.glb) | NASA Visualization Technology Applications and Development (VTAD) / NASA Science. Self-contained glTF 2.0 binary (1 mesh, 1 material, 1 embedded PNG texture). NASA content; use consistent with the [NASA Images and Media Usage Guidelines](https://www.nasa.gov/nasa-brand-center/images-and-media/). No NASA insignia or logo is used. **Render-only:** loaded lazily only when Bennu is selected and focused in the Overview; adds no mass, physical radius, gravity, rotation physics, or dynamics. |
 
 The two Earth files were verified on 2026-10-20; the four planetary files and the GOES GLB were verified on
-2026-10-21. The six images total 3,672,242 bytes (about 3.50 MiB); the GOES GLB adds 6,439,892 bytes
-(about 6.14 MiB), for 10,112,134 bytes (about 9.64 MiB) of local visual assets. If the Earth surface texture
-is unavailable, the scene keeps a procedural Earth fallback; if a planet texture is unavailable or fails to
-load, that body falls back to its documented procedural colour. If the GOES mesh is unavailable, the viewport
-keeps the particle marker and states that the mesh was unavailable. The local asset review register records
-the full review trail, including rejected candidates; as with the other internal planning notes, it is not
-part of this publication.
+2026-10-21; the Bennu GLB was verified on 2026-10-24. The six images total 3,672,242 bytes (about 3.50 MiB);
+the GOES GLB adds 6,439,892 bytes (about 6.14 MiB) and the Bennu GLB adds 859,980 bytes (about 839.82 KiB,
+0.82 MiB), for 10,972,114 bytes (about 10.46 MiB) of local visual assets across eight files. If the Earth
+surface texture is unavailable, the scene keeps a procedural Earth fallback; if a planet texture is unavailable
+or fails to load, that body falls back to its documented procedural colour. If the GOES mesh is unavailable,
+the viewport keeps the particle marker and states that the mesh was unavailable. If the Bennu mesh is
+unavailable or Bennu is viewed at the wide system view, the Overview renders a procedural faceted rocky
+shape and states the active mesh/fallback status. The local asset review register records the full review
+trail, including rejected candidates; as with the other internal planning notes, it is not part of this
+publication.
 
 ## Requirements
 
@@ -160,12 +172,13 @@ part of this publication.
 | `npm run build` | Type-check and produce a production bundle in `dist/` |
 | `npm run preview` | Serve the production build locally |
 
-Current verification (2026-10-21): `npm test` reports 247 passing tests in 27 files and `npm run
+Current verification (2026-10-24): `npm test` reports 262 passing tests in 29 files and `npm run
 typecheck`, `npm run lint`, and `npm run build` exit 0. Re-run the commands rather than trusting those
 numbers; the automated tests cover the physics core, the scenario bridge, result summaries, the comparison
 math, the cached reference parser/provenance, texture-load fallback handling, the Solar System body
-registry and screen behavior, the circular-orbit mission evaluator, the mission interaction flow, the GOES
-GLB header/checksum/provenance contract, and the existing workspace interaction flows.
+registry (including 101955 Bennu) and screen behavior, the deterministic 10-body projected-label collision
+resolver, the circular-orbit mission evaluator, the mission interaction flow, the GOES and Bennu GLB
+header/checksum/provenance/fallback contracts, and the existing workspace interaction flows.
 
 ## Project structure
 
@@ -178,12 +191,12 @@ src/
   data/         # Cached JPL Horizons fixture, parser, provenance, reference preset
   comparison/   # Run records, candidate runs, altitude series, shared-sample differences
   results/      # Display metrics and formatting derived from recorded samples
-  solarSystem/  # Display-only Solar System registry: bodies, schematic layout, camera poses
+  solarSystem/  # Display-only Solar System registry: bodies (Sun, 8 planets, Bennu), schematic layout, camera poses
   app/          # Workspace panels, playback, comparison chart, mission UI, Overview screen
-  scene/        # 3D viewports (display only, one-way km -> scene-unit transform) and GOES mesh
+  scene/        # 3D viewports (display only, one-way km -> scene-unit transform), GOES & Bennu meshes
   components/   # Presentation-only UI primitives
   test/         # Shared test setup
-public/assets/  # Locally served visual assets (NASA Earth/planetary textures and GOES GLB)
+public/assets/  # Locally served visual assets (NASA Earth/planetary textures, GOES & Bennu GLBs)
 docs/           # Technical documentation (see below)
 ```
 
@@ -205,8 +218,9 @@ docs/           # Technical documentation (see below)
 - Additional mission templates, mission history, and configurable acceptance thresholds. One circular-orbit
   template is implemented; the app does not score arbitrary mission designs.
 - An AI explanation layer; the simulation works without one and no results are generated by a model.
-- A general 3D asset-loading pipeline or a spacecraft model catalogue. The current build adds one verified,
-  lazily loaded, render-only GOES GLB plus the six local textures described above and their fallbacks.
+- A general 3D asset-loading pipeline or a spacecraft/small-body model catalogue. The current build adds two
+  verified, lazily loaded, render-only GLBs (GOES-R and 101955 Bennu) plus the six local textures described
+  above and their fallbacks.
 - Persistence, accounts, sharing, and deployment configuration.
 - Additional force models (N-body, thrust, drag) and any multi-body or spacecraft dynamics. The Solar
   System Overview uses period-proportional schematic circular motion only; it does not model heliocentric

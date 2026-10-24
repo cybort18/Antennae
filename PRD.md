@@ -3,7 +3,7 @@
 **Working Product Name:** Antennae (working title: *Space Sandbox*)  
 **Repository:** [https://github.com/cybort18/Antennae](https://github.com/cybort18/Antennae)  
 **Document Status:** Canonical Product Specification (Phase 4 / V3 Workspace baseline)  
-**Last Verified:** 2026-10-23 (27 test files, 247 tests passing)
+**Last Verified:** 2026-10-24 (29 test files, 262 tests passing)
 
 ---
 
@@ -65,12 +65,12 @@ The application provides three distinct operational surfaces accessible via top-
 
 ### 3.1 Solar System Overview (Orientation & Reference Surface)
 - **Role:** Default landing view that establishes cosmic scale and context before entering orbital simulation.
-- **Scope & Limitations:** A schematic 3D visualization of the Sun and eight planets with sourced NASA/JPL physical reference facts and an opt-in, period-proportional schematic motion control. It is **not** a dated ephemeris, dynamic simulation, or N-body model. Sizes, distances, and orbit spacings are compressed for legibility.
+- **Scope & Limitations:** A schematic 3D visualization of the Sun, eight planets, and near-Earth asteroid **101955 Bennu** with sourced NASA/JPL physical reference facts and an opt-in, period-proportional schematic motion control. It is **not** a dated ephemeris, dynamic simulation, or N-body model. Sizes, distances, and orbit spacings are compressed for legibility, and Bennu's circular schematic guide is explicitly distinguished from its real eccentric, inclined Apollo orbit.
 - **User Flow:**
-  1. User lands on the Overview; inspects the Sun and eight planets (motion starts paused at `+0.0 Earth days`).
-  2. Selects any body via clickable canvas labels or the body drawer list.
-  3. Inspects physical reference facts (volumetric mean radius, semi-major axis, sidereal orbital period in Earth days and Julian years, eccentricity, inclination) with official NASA/JPL provenance links and local NASA texture attribution.
-  4. Focuses camera on the selected body, steps/scrubs/plays illustrative schematic motion (0–3,650 Earth days at 10, 60, or 365 d/s), or resets to system view.
+  1. User lands on the Overview; inspects the Sun, eight planets, and asteroid 101955 Bennu (motion starts paused at `+0.0 Earth days`).
+  2. Selects any body via clickable collision-resolved canvas labels or the body drawer list.
+  3. Inspects physical reference facts (volumetric or derived mean radius, semi-major axis, sidereal orbital period in Earth days and Julian years, eccentricity, inclination, plus Bennu's rotation period and perihelion/aphelion distances) with official NASA/JPL provenance links and local NASA texture/mesh attribution.
+  4. Focuses camera on the selected body (lazily loading the official NASA VTAD 3D GLB mesh when Bennu is focused, with a procedural rocky shape at system view or on load failure), steps/scrubs/plays illustrative schematic motion (0–3,650 Earth days at 10, 60, or 365 d/s), or resets to system view.
   5. Switches reversibly to Earth Orbit Lab or Mission Designer (automatically pausing schematic motion while preserving elapsed schematic days and in-memory simulation records).
 
 ### 3.2 Earth Orbit Lab (Open Physics Sandbox)
@@ -144,7 +144,7 @@ The conceptual origin and initial feature blueprint for this project is recorded
 | **Units & Frame** | Explicit units, Earth-centered inertial frame | km, s, kg, km/s, km³/s²; EME2000-family axes, no attached epoch | Implemented |
 | **NASA/JPL Data** | Live Horizons/SBDB API with cached fallback | 1 cached JPL Horizons fixture (GOES-16 vectors) with provenance | Cached preset implemented; live API deferred |
 | **3D Rendering** | Three.js / React Three Fiber scene | R3F + Drei viewport, textured Earth, static clouds, star field, DOM labels | Implemented |
-| **3D Assets** | Curated external models/textures with attribution | 6 local NASA textures (~3.50 MiB) + 1 local NASA GOES-R GLB (~6.14 MiB, render-only) | Implemented & credited; render-only separation |
+| **3D Assets** | Curated external models/textures with attribution | 6 local NASA textures (~3.50 MiB) + 1 local NASA GOES-R GLB (~6.14 MiB, render-only) + 1 local NASA VTAD Bennu GLB (~0.82 MiB, render-only on focus) | Implemented & credited; render-only separation |
 | **Comparison** | Baseline vs. candidate scenario comparison | Immutable `ScenarioRecord` architecture, SVG altitude chart, common-sample delta metrics | Implemented (zero-dependency SVG) |
 | **Mission Flow** | Goal-driven templates with calculated outcomes | Template: *Design a Stable Circular Earth Orbit* with PASS/FAIL/NOT EVALUABLE rules | Implemented & tested |
 | **AI Copilot** | Context-grounded explainer for run results | Not implemented (`src/ai/` does not exist) | Deferred to Phase 5; strictly out of MVP |
@@ -176,7 +176,7 @@ Scope Lock  Interaction Physics     JPL Data    Visual Found. Solar System Missi
 
 | ID | Capability | Acceptance Criteria | Current Status |
 |---|---|---|---|
-| **MVP-01** | 3D Scene | User can view/select target body and spacecraft; camera controls do not block actions; responsive viewports. | **Met** (Overview Sun + 8 planets, Lab Earth + orbit + particle + render-only GOES mesh; procedural fallbacks). |
+| **MVP-01** | 3D Scene | User can view/select target body and spacecraft; camera controls do not block actions; responsive viewports. | **Met** (Overview Sun + 8 planets + 101955 Bennu with focus-loaded NASA VTAD mesh, Lab Earth + orbit + particle + render-only GOES mesh; procedural fallbacks). |
 | **MVP-02** | Scenario Editor | Documented parameters editable; invalid values rejected with clear messages; reference preset loading. | **Met** (Altitude, speed, revolutions editable with range guardrails; cached preset loaded exactly or as circular approximation). |
 | **MVP-03** | Physics Simulation | Supported scenario runs from defined initial conditions and returns reproducible outputs for identical inputs. | **Met** (Deterministic kick-drift-kick leapfrog core, bounded energy error, benchmarked tolerances). |
 | **MVP-04** | Playback | Play, pause, step, reset, scrub, and time scale reflect real recorded simulation state. | **Met** (Sample-quantized timeline cursor; never interpolates or fabricates states). |
@@ -185,7 +185,7 @@ Scope Lock  Interaction Physics     JPL Data    Visual Found. Solar System Missi
 | **MVP-07** | Provenance | Source-derived presets record provider, target ID, retrieval timestamp, epoch, frame, center, and units. | **Met** (GOES-16 JPL Horizons fixture with complete metadata displayed in UI and disclosures). |
 | **MVP-08** | AI Explanation | AI assistant explains computed results, calls out assumptions, and never fabricates simulation outputs. | **Deferred** (No AI code in current build; `src/ai/` does not exist). |
 | **MVP-09** | Resilience | Bundled cached inputs and procedural fallbacks support the demo when external networks are unavailable. | **Met** (Cached Horizons fixture, local NASA textures, procedural Earth/planet fallbacks, marker fallback for GLB). |
-| **MVP-10** | Reproducible Demo | Full user journey works reliably from a clean app state and is verified by automated tests. | **Met** (27 test files / 247 tests pass; production build succeeds with exit code 0). |
+| **MVP-10** | Reproducible Demo | Full user journey works reliably from a clean app state and is verified by automated tests. | **Met** (29 test files / 262 tests pass; production build succeeds with exit code 0). |
 
 ---
 

@@ -2,7 +2,7 @@
 
 **Repository:** [https://github.com/cybort18/Antennae](https://github.com/cybort18/Antennae)  
 **Document Status:** Canonical 3D Asset Specification & Attribution Register  
-**Last Verified:** 2026-10-23 (All 7 shipped files verified locally; SHA-256 and byte counts checked)
+**Last Verified:** 2026-10-24 (All 8 shipped files verified locally; SHA-256 and byte counts checked)
 
 ---
 
@@ -25,9 +25,9 @@
 
 ## 2. Complete Asset Attribution Register (Shipped Assets)
 
-The application ships seven locally hosted visual assets totaling **10,112,134 bytes** (~9.64 MiB): six texture images (3,672,242 bytes, ~3.50 MiB) and one spacecraft model (6,439,892 bytes, ~6.14 MiB).
+The application ships eight locally hosted visual assets totaling **10,972,114 bytes** (~10.46 MiB): six texture images (3,672,242 bytes, ~3.50 MiB), one spacecraft model (6,439,892 bytes, ~6.14 MiB), and one small-body asteroid model (859,980 bytes, ~839.82 KiB / ~0.82 MiB).
 
-*Note on Asset Budget:* The initial 8 MiB asset target applied specifically to the 2D texture suite (which is well within budget at ~3.50 MiB). The GOES GLB was added under a separate lazy-load model budget and is loaded strictly on demand.
+*Note on Asset Budget:* The initial 8 MiB asset target applied specifically to the 2D texture suite (which is well within budget at ~3.50 MiB). Both the GOES-R GLB and the 101955 Bennu GLB were added under separate lazy-load model budgets (with a `< 5 MiB` gate for Bennu; actual size 859,980 bytes) and are loaded strictly on demand rather than at startup.
 
 | Local Path | Asset Name | Creator / Contributor | Original Asset URL | License / Usage Terms | Required Attribution Line | Verified File Properties | Shipped Use |
 |---|---|---|---|---|---|---|---|
@@ -38,6 +38,7 @@ The application ships seven locally hosted visual assets totaling **10,112,134 b
 | `public/assets/planets/venus.jpg` | Venus Surface Map (Radar-Derived) | NASA / JPL-Caltech (inferred from JPL database; source has no explicit credit line) | [`Venus.jpg`](https://assets.science.nasa.gov/content/dam/science/cds/3d/resources/image/venus/Venus.jpg) via [NASA 3D Resources: Venus](https://science.nasa.gov/3d-resources/venus/) | NASA content; Magellan radar imagery with gaps filled. Radar-derived topography, **not natural colour**. NASA Guidelines apply. | "Venus surface: NASA/JPL-Caltech (Magellan radar, radar-derived surface)" | 1,166,974 bytes; JPEG (`FF D8 FF E0`); 1440 × 720 px; verified 2026-10-21 | Venus surface in Solar System Overview (display only; labeled radar-derived). |
 | `public/assets/planets/neptune.jpg` | Neptune Illustrative Map | Don Davis & JPL/Caltech | [`Neptune.jpg`](https://assets.science.nasa.gov/content/dam/science/cds/3d/resources/image/neptune/Neptune.jpg) via [NASA 3D Resources: Neptune](https://science.nasa.gov/3d-resources/neptune/) | NASA content; fictional cloud-feature texture created for visualization; **not an observational map**. NASA Guidelines apply. | "Neptune visualization texture: Don Davis & JPL/Caltech (illustrative)" | 210,528 bytes; JPEG (`FF D8 FF E0`); 720 × 360 px; verified 2026-10-21 | Neptune surface in Solar System Overview (display only; labeled illustrative). |
 | `public/assets/models/goes-r.glb` | GOES-R Spacecraft 3D Model | NASA GOES Program / NASA Science (Lockheed Martin credited on page for renderings; downloadable GLB carries no separate embedded copyright) | [`GOES-R.glb`](https://assets.science.nasa.gov/content/dam/science/missions/goes/spacecraft/3dmodel/GOES-R.glb) via [NASA GOES Model Page](https://science.nasa.gov/mission/goes-spacecraft-3d-model/) | NASA content; NASA 3D Resources states its assets are free and without copyright. NASA Guidelines apply. Visual representation only. | "GOES spacecraft 3D model: NASA Science / GOES Program" | 6,439,892 bytes; glTF 2.0 binary (`glTF` magic); SHA-256: `C3549A276B7899253C60E82B0B24A3CFFB6A39E0DAD1A8C7F30A73E8DCEB6398`; 28 meshes, 17 materials, 4 textures; verified 2026-10-21 | Render-only marker for GOES-16 reference runs in Earth Orbit Lab. Adds no mass, attitude, thrust, or physics. |
+| `public/assets/models/bennu.glb` | Asteroid 101955 Bennu 3D Model | NASA Visualization Technology Applications and Development (VTAD) / NASA Science | [`Bennu_1_1.glb`](https://assets.science.nasa.gov/content/dam/science/psd/solar/2023/09/b/Bennu_1_1.glb) via [NASA Science — Bennu 3D Model](https://science.nasa.gov/resource/bennu-3d-model/) | NASA content; NASA 3D Resources states its assets are free and without copyright. Use consistent with [NASA Images & Media Guidelines](https://www.nasa.gov/nasa-brand-center/images-and-media/). No NASA logo used. Visual representation only. | "Bennu 3D model: NASA Visualization Technology Applications and Development (VTAD)" | 859,980 bytes (~839.82 KiB); glTF 2.0 binary (`glTF` magic, version 2); SHA-256: `B7740B53A77FF538082D26E7079510EF7810FC3DE9A5FF0FA316B393D2CF700E`; 1 mesh (1,419 vertices, 8,076 indices), 1 material, 1 embedded PNG texture, 0 external URI dependencies; verified 2026-10-24 | Render-only focused 3D mesh for asteroid 101955 Bennu in Solar System Overview. Loaded lazily only when Bennu is selected and focused; adds no mass, physical radius, gravity, rotation physics, or dynamics. |
 
 ---
 
@@ -68,6 +69,21 @@ The application ships seven locally hosted visual assets totaling **10,112,134 b
   - If `blue-marble-2048.jpg` fails, `EarthSphere` falls back to a procedural blue/green sphere material.
   - If `blue-marble-clouds-2048.jpg` fails, the cloud sphere shell is omitted.
   - If any planetary texture fails, the planet sphere renders its documented procedural hex color from `src/solarSystem/bodies.ts`.
+
+### 3.3 Asteroid 101955 Bennu GLB Pipeline
+- **Storage Location:** `public/assets/models/bennu.glb`.
+- **Loading Behavior (`src/scene/bennuModel.ts` & `src/scene/BennuAsteroidModel.tsx`):**
+  - At the wide Solar System view (`focusMode === 'overview'`) or when another body is selected, Bennu renders a lightweight procedural faceted rocky shape (`<icosahedronGeometry args={[body.displayRadius, 1]} />` with `flatShading`).
+  - Loaded lazily through Three.js `GLTFLoader` **only** when `bennuModelForOverviewState` confirms `selectedId === 'bennu' && focusMode === 'body'`.
+  - Never preloaded at application startup or when inspecting planets.
+  - Active fetch requests are aborted if the user switches bodies, resets to system view, or unmounts the Overview before loading completes.
+  - Cloned materials and source geometry/material/texture GPU resources are explicitly disposed via `disposeObject3DResources` on unmount.
+- **Display Normalization:**
+  - `normalizeBennuScene` computes the bounding box of the loaded mesh, centers it at `[0, 0, 0]`, scales its maximum dimension to `2 * displayRadius` (`0.44` scene units), and applies a subtle warm-rock emissive/roughness lift so surface facets remain legible under scene lighting.
+  - **Render-Only Invariant:** No vertices, bounds, or materials are ever read by `src/simulation/`, `src/missions/`, or `src/comparison/`.
+- **Failure & Fallback Behavior:**
+  - If `/assets/models/bennu.glb` fails to fetch or parse, `loadBennuModelScene` resolves to `null`, keeping the procedural faceted rocky shape visible without throwing an unhandled error.
+  - Both the viewport badge (`data-testid="bennu-mesh-status"`) and the selected-body reference card report `"Bennu mesh unavailable · procedural rocky fallback"`.
 
 ---
 
@@ -116,6 +132,8 @@ The following asset types were formally evaluated and rejected to protect reposi
    *Reason for Rejection:* Multi-gigabyte elevation models exceed web constraints and provide zero benefit for high-altitude orbital mechanics.
 5. **Photometric Star Panoramas / HDRIs:**  
    *Reason for Rejection:* Large downloads rejected in favor of a lightweight, deterministic procedural star field (`src/scene/Starfield.tsx`).
+6. **NASA SVS High-Resolution Bennu Shape Models (`https://svs.gsfc.nasa.gov/5069`):**
+   *Reason for Rejection:* The Scientific Visualization Studio laser-altimetry topography models on SVS 5069 are multi-hundred-megabyte high-polygon research meshes intended for offline rendering, far exceeding the `< 5 MiB` web asset gate. The lightweight official NASA Science / VTAD glTF 2.0 binary (`Bennu_1_1.glb`, 859,980 bytes) was selected instead.
 
 ---
 

@@ -35,6 +35,7 @@ import {
   type SchematicPlaybackRate,
 } from '../solarSystem/schematicMotion';
 import { ModeTabs, type WorkspaceMode } from './ModeTabs';
+import { type BennuMeshStatus } from '../scene/bennuModel';
 import { SolarSystemViewport } from '../scene/SolarSystemViewport';
 
 const NOT_APPLICABLE = 'Not applicable (central star)';
@@ -42,6 +43,9 @@ const NOT_APPLICABLE = 'Not applicable (central star)';
 function formatMeanRadiusKm(meanRadiusKm: number): string {
   if (Number.isInteger(meanRadiusKm)) {
     return `${formatInteger(meanRadiusKm)} km`;
+  }
+  if (meanRadiusKm < 1) {
+    return `${formatNumber(meanRadiusKm, 5)} km (${formatNumber(meanRadiusKm * 1000, 1)} m)`;
   }
   return `${formatNumber(meanRadiusKm, 1)} km`;
 }
@@ -57,7 +61,9 @@ function BodySelector({
     <section className="panel overview-panel overview-panel--bodies" aria-labelledby="ss-bodies-heading">
       <header className="panel__header">
         <h2 id="ss-bodies-heading">Bodies</h2>
-        <p className="panel__subtitle">Sun + eight planets · schematic reference layout</p>
+        <p className="panel__subtitle">
+          Sun, eight planets &amp; 101955 Bennu · schematic reference layout
+        </p>
       </header>
       <div className="panel__body">
         <ul className="ss-bodylist">
@@ -79,7 +85,9 @@ function BodySelector({
                   <span className="ss-bodylist__meta">
                     {body.kind === 'star'
                       ? 'Star · centre'
-                      : `${body.orderFromSun} of 8 · ${kindLabel(body.kind)}`}
+                      : body.orderFromSun === null
+                        ? 'Small body · Apollo NEA (between Earth & Mars)'
+                        : `${body.orderFromSun} of 8 · ${kindLabel(body.kind)}`}
                   </span>
                 </span>
               </button>
@@ -99,15 +107,18 @@ function SelectedBodyPanel({
   selectedId,
   focusMode,
   elapsedDays,
+  bennuMeshStatus,
   onResetView,
 }: {
   selectedId: SolarSystemBodyId;
   focusMode: CameraFocusMode;
   elapsedDays: number;
+  bennuMeshStatus: BennuMeshStatus;
   onResetView: () => void;
 }) {
   const body = bodyById(selectedId);
   const texture = body.texture;
+  const model = body.model;
   const { facts } = body;
 
   return (
@@ -118,7 +129,7 @@ function SelectedBodyPanel({
     >
       <header className="panel__header">
         <h2 id="ss-selected-heading">Selected body</h2>
-        <p className="panel__subtitle">Reference visualization & physical facts</p>
+        <p className="panel__subtitle">Reference visualization &amp; physical facts</p>
       </header>
       <div className="panel__body">
         <div className="ss-selected__title">
@@ -138,17 +149,30 @@ function SelectedBodyPanel({
             <dd>
               {body.orderFromSun === 0
                 ? 'Centre of the system'
-                : `${body.orderFromSun} of 8 from the Sun`}
+                : body.orderFromSun === null
+                  ? 'Between Earth and Mars (near-Earth asteroid; not a planet)'
+                  : `${body.orderFromSun} of 8 from the Sun`}
             </dd>
           </div>
           <div>
             <dt>Class</dt>
-            <dd>{kindLabel(body.kind)}</dd>
+            <dd>{facts.orbitClassLabel ?? kindLabel(body.kind)}</dd>
           </div>
           <div>
             <dt>Mean radius</dt>
-            <dd>{formatMeanRadiusKm(facts.meanRadiusKm)}</dd>
+            <dd>
+              {formatMeanRadiusKm(facts.meanRadiusKm)}
+              {facts.effectiveDiameterKm !== undefined
+                ? ` (derived: ${formatNumber(facts.effectiveDiameterKm, 5)} km diameter / 2)`
+                : ''}
+            </dd>
           </div>
+          {facts.rotationPeriodHours !== undefined ? (
+            <div>
+              <dt>Rotation period</dt>
+              <dd>{formatNumber(facts.rotationPeriodHours, 4)} h (synodic)</dd>
+            </div>
+          ) : null}
           <div>
             <dt>Semi-major axis</dt>
             <dd>
@@ -157,6 +181,14 @@ function SelectedBodyPanel({
                 : `${formatNumber(facts.semiMajorAxisAu, 4)} AU`}
             </dd>
           </div>
+          {facts.perihelionAu !== undefined && facts.aphelionAu !== undefined ? (
+            <div>
+              <dt>Perihelion / aphelion</dt>
+              <dd>
+                {formatNumber(facts.perihelionAu, 4)} AU / {formatNumber(facts.aphelionAu, 4)} AU
+              </dd>
+            </div>
+          ) : null}
           <div>
             <dt>Sidereal period</dt>
             <dd>
@@ -185,19 +217,40 @@ function SelectedBodyPanel({
           <div>
             <dt>Position</dt>
             <dd>
-              {elapsedDays === 0
-                ? 'Fixed illustrative angle · not an ephemeris'
-                : 'Period-proportional schematic angle · not an ephemeris'}
+              {body.kind === 'small-body'
+                ? elapsedDays === 0
+                  ? 'Fixed illustrative angle on circular guide · not an ephemeris or rendered ellipse'
+                  : 'Period-proportional circular schematic angle · not an ephemeris or rendered ellipse'
+                : elapsedDays === 0
+                  ? 'Fixed illustrative angle · not an ephemeris'
+                  : 'Period-proportional schematic angle · not an ephemeris'}
             </dd>
           </div>
           <div>
             <dt>Orbit guide</dt>
-            <dd>Schematic order only</dd>
+            <dd>
+              {body.kind === 'small-body'
+                ? 'Compressed circular schematic between Earth & Mars (real eccentric/inclined orbit not rendered)'
+                : 'Schematic order only'}
+            </dd>
           </div>
           <div>
             <dt>Display surface</dt>
             <dd>
-              {texture ? (
+              {model ? (
+                <>
+                  <a href={model.sourcePageUrl} target="_blank" rel="noreferrer">
+                    {model.sourceLabel} 3D mesh (NASA VTAD)
+                  </a>
+                  {focusMode === 'overview'
+                    ? ' · procedural faceted shape at wide overview (focus body to load mesh)'
+                    : bennuMeshStatus === 'fallback'
+                      ? ' · mesh unavailable; procedural faceted rocky fallback active'
+                      : bennuMeshStatus === 'ready'
+                        ? ' · lazy-loaded GLB active (exaggerated display scale)'
+                        : ' · loading GLB (procedural faceted rocky fallback active)'}
+                </>
+              ) : texture ? (
                 <>
                   <a href={texture.sourcePageUrl} target="_blank" rel="noreferrer">
                     {texture.illustrative
@@ -243,7 +296,7 @@ function SelectedBodyPanel({
         </div>
 
         <details className="ss-disclosure">
-          <summary>Sources, scale & limitations</summary>
+          <summary>Sources, scale &amp; limitations</summary>
           <p>{SOLAR_SYSTEM_MODE_NOTE}</p>
           <p>{SOLAR_SYSTEM_SCHEMATIC_MOTION_NOTE}</p>
           <p>{SOLAR_SYSTEM_ORBIT_NOTE}</p>
@@ -257,6 +310,14 @@ function SelectedBodyPanel({
               JPL Approximate Positions of the Planets
             </a>{' '}
             (Table 1 J2000 mean-ecliptic Keplerian elements, valid 1800–2050),{' '}
+            <a href="https://ssd-api.jpl.nasa.gov/doc/sbdb.html" target="_blank" rel="noreferrer">
+              JPL Small-Body Database (SBDB) API
+            </a>{' '}
+            and{' '}
+            <a href="https://ssd.jpl.nasa.gov/sb/orbits.html" target="_blank" rel="noreferrer">
+              JPL Small-Body Orbital Elements
+            </a>{' '}
+            (101955 Bennu physical parameters and osculating elements),{' '}
             <a href="https://ssd.jpl.nasa.gov/astro_par.html" target="_blank" rel="noreferrer">
               JPL Astrodynamic Parameters
             </a>{' '}
@@ -275,7 +336,18 @@ function SelectedBodyPanel({
             two-body test-particle model. This overview does not feed its illustrative positions or
             display sizes into that engine.
           </p>
-          {texture ? (
+          {model ? (
+            <p>
+              {model.credit}. {model.creditDetail} {model.renderNote}{' '}
+              <a href={model.sourcePageUrl} target="_blank" rel="noreferrer">
+                Source page
+              </a>
+              {' · '}
+              <a href={model.fileUrl} target="_blank" rel="noreferrer">
+                Original GLB
+              </a>
+            </p>
+          ) : texture ? (
             <p>
               {texture.credit}. {texture.creditDetail}{' '}
               <a href={texture.sourcePageUrl} target="_blank" rel="noreferrer">
@@ -293,9 +365,10 @@ function SelectedBodyPanel({
             </p>
           )}
           <p>
-            Surface textures are display assets, not physical data. If a local texture cannot be
-            loaded, that body keeps its procedural fallback colour. NASA content is used with the
-            NASA Images and Media Usage Guidelines; no NASA insignia or logo is used.
+            Surface textures and 3D meshes are display assets, not physical data. If a local texture
+            or mesh cannot be loaded, that body keeps its procedural fallback shape or colour. NASA
+            content is used with the NASA Images and Media Usage Guidelines; no NASA insignia or
+            logo is used.
           </p>
           <p>
             <a href="https://science.nasa.gov/3d-resources/" target="_blank" rel="noreferrer">
@@ -453,6 +526,8 @@ export function SolarSystemOverview({
 }: SolarSystemOverviewProps) {
   const [focusMode, setFocusMode] = useState<CameraFocusMode>('overview');
   const [focusSignal, setFocusSignal] = useState(0);
+  const [bennuMeshStatus, setBennuMeshStatus] =
+    useState<BennuMeshStatus>('procedural-overview');
   const [localElapsedDays, setLocalElapsedDays] = useState(0);
   const [localRateDaysPerSec, setLocalRateDaysPerSec] =
     useState<SchematicPlaybackRate>(DEFAULT_SCHEMATIC_RATE);
@@ -575,6 +650,7 @@ export function SolarSystemOverview({
           focusSignal={focusSignal}
           elapsedDays={elapsedDays}
           onSelect={focusBody}
+          onBennuMeshStatusChange={setBennuMeshStatus}
         />
 
         <aside className="overview__column overview__column--left" aria-label="Solar System bodies">
@@ -586,6 +662,7 @@ export function SolarSystemOverview({
             selectedId={selectedId}
             focusMode={focusMode}
             elapsedDays={elapsedDays}
+            bennuMeshStatus={bennuMeshStatus}
             onResetView={resetView}
           />
         </aside>
