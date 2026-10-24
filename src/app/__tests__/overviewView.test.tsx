@@ -65,7 +65,26 @@ vi.mock('../../scene/SolarSystemViewport', () => ({
   ),
 }));
 
+import { PerspectiveCamera, Vector3 } from 'three';
+
 import App from '../../App';
+import {
+  DEFAULT_LABEL_PRIORITY_ORDER,
+  FALLBACK_LABEL_DIMENSIONS,
+  LABEL_COLLISION_MARGIN_PX,
+  labelBoundingBox,
+  labelPriorityOrder,
+  labelsOverlap,
+  resolveSolarSystemLabelCollisions,
+  type ProjectedLabelCandidate,
+  type ResolvedLabelLayout,
+} from '../../scene/solarSystemLabels';
+import {
+  SOLAR_SYSTEM_BODIES,
+  cameraPose,
+  type SolarSystemBodyId,
+} from '../../solarSystem/bodies';
+import { schematicBodyPosition } from '../../solarSystem/schematicMotion';
 
 afterEach(cleanup);
 
@@ -274,4 +293,169 @@ describe('Solar System Overview', () => {
     expect(screen.getAllByRole('button', { name: 'Run playback' }).length).toBeGreaterThan(0);
     expect(screen.queryAllByRole('button', { name: 'Pause playback' })).toHaveLength(0);
   }, 20000);
+
+  it('keeps all nine projected labels visible at elapsedDays = 0 and deterministically suppresses overlapping lower-priority labels at conjunction times while keeping every body selectable', async () => {
+    const projectOverviewCandidates = (
+      width: number,
+      height: number,
+      elapsedDays: number,
+    ): ProjectedLabelCandidate[] => {
+      const pose = cameraPose('overview', 'sun', elapsedDays);
+      const aspect = width / Math.max(height, 1);
+      const overviewScale = Math.min(1.45, Math.max(1, 1.12 / aspect));
+      const camera = new PerspectiveCamera(42, aspect, pose.near, pose.far);
+      camera.position.set(
+        pose.position[0] * overviewScale,
+        pose.position[1] * overviewScale,
+        pose.position[2] * overviewScale,
+      );
+      camera.lookAt(...pose.target);
+      camera.updateMatrixWorld(true);
+      camera.updateProjectionMatrix();
+
+      const point = new Vector3();
+      return SOLAR_SYSTEM_BODIES.map((body) => {
+        const dims = FALLBACK_LABEL_DIMENSIONS[body.id];
+        const [x, , z] = schematicBodyPosition(body.id, elapsedDays);
+        const labelHeight = body.displayRadius + (body.id === 'sun' ? 1.9 : 0.68);
+        point.set(x, labelHeight, z).project(camera);
+        const screenX = (point.x * 0.5 + 0.5) * width;
+        const screenY = (-point.y * 0.5 + 0.5) * height;
+        const halfWidth = dims.width * 0.5;
+        const inFrustum =
+          point.z >= -1 &&
+          point.z <= 1 &&
+          screenX - halfWidth >= 0 &&
+          screenX + halfWidth <= width &&
+          screenY - dims.height >= 0 &&
+          screenY <= height;
+        return {
+          id: body.id,
+          x: screenX,
+          y: screenY,
+          width: dims.width,
+          height: dims.height,
+          inFrustum,
+        };
+      });
+    };
+
+    // Priority order always places the selected body first without duplicating it.
+    for (const body of SOLAR_SYSTEM_BODIES) {
+      const order = labelPriorityOrder(body.id);
+      expect(order).toHaveLength(SOLAR_SYSTEM_BODIES.length);
+      expect(order[0]).toBe(body.id);
+      expect(new Set(order).size).toBe(SOLAR_SYSTEM_BODIES.length);
+      expect(order.slice(1)).toEqual(
+        DEFAULT_LABEL_PRIORITY_ORDER.filter((id) => id !== body.id),
+      );
+    }
+
+    // At elapsedDays = 0 on desktop viewports, all nine labels remain visible with zero overlaps.
+    for (const [width, height] of [
+      [1600, 862],
+      [1280, 662],
+    ] as const) {
+      const candidates = projectOverviewCandidates(width, height, 0);
+      const resolved = resolveSolarSystemLabelCollisions(candidates, 'sun');
+      const visible = resolved.filter((item) => item.visible);
+      const suppressed = resolved.filter((item) => item.suppressed);
+      expect(visible).toHaveLength(9);
+      expect(suppressed).toHaveLength(0);
+    }
+
+    // Across representative conjunction times, no two visible labels overlap,
+    // the selected body is always visible, and repeated calls are identical.
+    const sampleDays = [0, 174, 180, 754, 957.3, 1825, 1906, 3650];
+    const reusableBuffer: ResolvedLabelLayout[] = [];
+    for (const [width, height] of [
+      [1600, 862],
+      [1280, 662],
+    ] as const) {
+      for (const days of sampleDays) {
+        const candidates = projectOverviewCandidates(width, height, days);
+        for (const selectedBody of SOLAR_SYSTEM_BODIES) {
+          const firstPass = resolveSolarSystemLabelCollisions(
+            candidates,
+            selectedBody.id,
+          );
+          const secondPass = resolveSolarSystemLabelCollisions(
+            candidates,
+            selectedBody.id,
+            {
+              marginPx: LABEL_COLLISION_MARGIN_PX,
+              out: reusableBuffer,
+            },
+          );
+          expect(secondPass).toEqual(firstPass);
+
+          const selectedLayout = firstPass.find(
+            (item) => item.id === selectedBody.id,
+          );
+          expect(selectedLayout?.visible).toBe(true);
+          expect(selectedLayout?.suppressed).toBe(false);
+
+          const visibleLayouts = firstPass.filter((item) => item.visible);
+          for (let i = 0; i < visibleLayouts.length; i += 1) {
+            for (let j = i + 1; j < visibleLayouts.length; j += 1) {
+              expect(
+                labelsOverlap(
+                  labelBoundingBox(visibleLayouts[i]),
+                  labelBoundingBox(visibleLayouts[j]),
+                ),
+              ).toBe(false);
+            }
+          }
+        }
+      }
+    }
+
+    // At 1825 days (where Sun and Mercury overlap in overview framing), Mercury is suppressed
+    // when Sun is selected, and becomes visible when Mercury is selected.
+    const candidates1825 = projectOverviewCandidates(1280, 662, 1825);
+    const sunSelected1825 = resolveSolarSystemLabelCollisions(candidates1825, 'sun');
+    expect(sunSelected1825.find((item) => item.id === 'sun')?.visible).toBe(true);
+    expect(sunSelected1825.find((item) => item.id === 'mercury')?.suppressed).toBe(true);
+
+    const mercurySelected1825 = resolveSolarSystemLabelCollisions(
+      candidates1825,
+      'mercury',
+    );
+    expect(mercurySelected1825.find((item) => item.id === 'mercury')?.visible).toBe(true);
+    expect(mercurySelected1825.find((item) => item.id === 'sun')?.suppressed).toBe(true);
+
+    // At mobile width (singleSelectedLabelOnly), only the selected body label is visible.
+    const mobileCandidates = projectOverviewCandidates(390, 439, 180);
+    for (const selectedId of ['sun', 'mercury', 'mars', 'neptune'] as SolarSystemBodyId[]) {
+      const mobileResolved = resolveSolarSystemLabelCollisions(
+        mobileCandidates,
+        selectedId,
+        { singleSelectedLabelOnly: true },
+      );
+      expect(mobileResolved.filter((item) => item.visible).map((item) => item.id)).toEqual([
+        selectedId,
+      ]);
+      expect(mobileResolved.filter((item) => item.suppressed)).toHaveLength(8);
+    }
+
+    // Verify in the DOM that bodies whose projected labels are suppressed at 1825 d remain
+    // selectable through the body selector list and update the details panel.
+    const user = userEvent.setup();
+    render(<App />);
+    const scrubber = screen.getByRole('slider', {
+      name: 'Schematic elapsed time (Earth days)',
+    });
+    fireEvent.change(scrubber, { target: { value: '1825' } });
+    expect(screen.getByTestId('schematic-elapsed-readout').textContent).toBe(
+      'Schematic elapsed time: +1825.0 Earth days',
+    );
+
+    const bodySelector = within(screen.getByLabelText('Solar System bodies'));
+    await user.click(bodySelector.getByRole('button', { name: /^Mercury/ }));
+    expect(screen.getByTestId('solar-system-viewport-stub').dataset.selectedId).toBe(
+      'mercury',
+    );
+    expect(screen.getByRole('heading', { name: 'Mercury' })).toBeTruthy();
+    expect(screen.getByText('2439.4 km')).toBeTruthy();
+  });
 });

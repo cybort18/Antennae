@@ -390,7 +390,7 @@ function SchematicMotionStrip({
           type="range"
           min={0}
           max={SCHEMATIC_DURATION_MAX_DAYS}
-          step={1}
+          step={0.1}
           value={clampSchematicDays(elapsedDays)}
           aria-label="Schematic elapsed time (Earth days)"
           onChange={(event) => onScrubDays(Number(event.target.value))}

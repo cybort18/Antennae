@@ -26,6 +26,14 @@ import {
 import { schematicBodyPosition } from '../solarSystem/schematicMotion';
 import { Starfield } from './Starfield';
 import { planetSurfaceState } from './planetSurface';
+import {
+  COMPACT_LABEL_VIEWPORT_MAX_WIDTH_PX,
+  FALLBACK_LABEL_DIMENSIONS,
+  LABEL_COLLISION_MARGIN_PX,
+  resolveSolarSystemLabelCollisions,
+  type ProjectedLabelCandidate,
+  type ResolvedLabelLayout,
+} from './solarSystemLabels';
 import { useLocalTexture } from './useLocalTexture';
 
 const ORBIT_SEGMENTS = 160;
@@ -143,46 +151,101 @@ function OrbitGuide({
   );
 }
 
-type LabelPositionUpdater = (
-  id: SolarSystemBodyId,
-  x: number,
-  y: number,
-  visible: boolean,
-) => void;
-
 type LabelRefMap = Partial<Record<SolarSystemBodyId, HTMLButtonElement | null>>;
 
 function LabelProjector({
   elapsedDays,
+  selectedId,
+  getLabelDimensions,
   onUpdate,
 }: {
   elapsedDays: number;
-  onUpdate: LabelPositionUpdater;
+  selectedId: SolarSystemBodyId;
+  getLabelDimensions: (id: SolarSystemBodyId) => { width: number; height: number };
+  onUpdate: (layouts: readonly ResolvedLabelLayout[]) => void;
 }) {
   const camera = useThree((state) => state.camera);
   const size = useThree((state) => state.size);
   const point = useMemo(() => new Vector3(), []);
+  const candidatesBufferRef = useRef<ProjectedLabelCandidate[]>(
+    SOLAR_SYSTEM_BODIES.map((body) => ({
+      id: body.id,
+      x: 0,
+      y: 0,
+      width: FALLBACK_LABEL_DIMENSIONS[body.id].width,
+      height: FALLBACK_LABEL_DIMENSIONS[body.id].height,
+      inFrustum: false,
+    })),
+  );
+  const resolvedBufferRef = useRef<ResolvedLabelLayout[]>(
+    SOLAR_SYSTEM_BODIES.map((body) => ({
+      id: body.id,
+      x: 0,
+      y: 0,
+      width: FALLBACK_LABEL_DIMENSIONS[body.id].width,
+      height: FALLBACK_LABEL_DIMENSIONS[body.id].height,
+      inFrustum: false,
+      visible: false,
+      suppressed: false,
+    })),
+  );
 
   useFrame(() => {
-    for (const body of SOLAR_SYSTEM_BODIES) {
+    camera.updateMatrixWorld();
+    const candidatesBuffer = candidatesBufferRef.current;
+    const resolvedBuffer = resolvedBufferRef.current;
+    const bodyCount = SOLAR_SYSTEM_BODIES.length;
+    for (let index = 0; index < bodyCount; index += 1) {
+      const body = SOLAR_SYSTEM_BODIES[index];
+      const candidate = candidatesBuffer[index];
+      const dims = getLabelDimensions(body.id);
+      candidate.id = body.id;
+      candidate.width = dims.width;
+      candidate.height = dims.height;
+
       const [x, , z] = schematicBodyPosition(body.id, elapsedDays);
       const labelHeight = body.displayRadius + (body.id === 'sun' ? 1.9 : 0.68);
       point.set(x, labelHeight, z).project(camera);
 
       if (point.z < -1 || point.z > 1) {
-        onUpdate(body.id, 0, 0, false);
+        candidate.x = 0;
+        candidate.y = 0;
+        candidate.inFrustum = false;
         continue;
       }
 
       const screenX = (point.x * 0.5 + 0.5) * size.width;
       const screenY = (-point.y * 0.5 + 0.5) * size.height;
-      if (screenX < -80 || screenX > size.width + 80 || screenY < -40 || screenY > size.height + 40) {
-        onUpdate(body.id, 0, 0, false);
+      const halfWidth = dims.width * 0.5;
+      if (
+        screenX - halfWidth < 0 ||
+        screenX + halfWidth > size.width ||
+        screenY - dims.height < 0 ||
+        screenY > size.height
+      ) {
+        candidate.x = screenX;
+        candidate.y = screenY;
+        candidate.inFrustum = false;
         continue;
       }
 
-      onUpdate(body.id, screenX, screenY, true);
+      candidate.x = screenX;
+      candidate.y = screenY;
+      candidate.inFrustum = true;
     }
+
+    const singleSelectedLabelOnly =
+      size.width <= COMPACT_LABEL_VIEWPORT_MAX_WIDTH_PX ||
+      (typeof window !== 'undefined' &&
+        window.innerWidth <= COMPACT_LABEL_VIEWPORT_MAX_WIDTH_PX);
+
+    resolveSolarSystemLabelCollisions(candidatesBuffer, selectedId, {
+      marginPx: LABEL_COLLISION_MARGIN_PX,
+      singleSelectedLabelOnly,
+      out: resolvedBuffer,
+    });
+
+    onUpdate(resolvedBuffer);
   });
 
   return null;
@@ -360,20 +423,75 @@ export function SolarSystemViewport({
 }: SolarSystemViewportProps) {
   const initialPose = cameraPose(focusMode, selectedId, elapsedDays);
   const labelRefs = useRef<LabelRefMap>({});
+  const labelDimensionsRef = useRef<
+    Record<SolarSystemBodyId, { width: number; height: number }>
+  >({
+    sun: { ...FALLBACK_LABEL_DIMENSIONS.sun },
+    mercury: { ...FALLBACK_LABEL_DIMENSIONS.mercury },
+    venus: { ...FALLBACK_LABEL_DIMENSIONS.venus },
+    earth: { ...FALLBACK_LABEL_DIMENSIONS.earth },
+    mars: { ...FALLBACK_LABEL_DIMENSIONS.mars },
+    jupiter: { ...FALLBACK_LABEL_DIMENSIONS.jupiter },
+    saturn: { ...FALLBACK_LABEL_DIMENSIONS.saturn },
+    uranus: { ...FALLBACK_LABEL_DIMENSIONS.uranus },
+    neptune: { ...FALLBACK_LABEL_DIMENSIONS.neptune },
+  });
+  const measuredMaskRef = useRef<Partial<Record<SolarSystemBodyId, boolean>>>({});
 
-  const updateLabel = useCallback<LabelPositionUpdater>((id, x, y, visible) => {
-    const element = labelRefs.current[id];
-    if (!element) {
-      return;
+  useEffect(() => {
+    const handleResize = (): void => {
+      measuredMaskRef.current = {};
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const getLabelDimensions = useCallback((id: SolarSystemBodyId) => {
+    if (!measuredMaskRef.current[id]) {
+      const element = labelRefs.current[id];
+      if (element && element.offsetWidth > 0 && element.offsetHeight > 0) {
+        labelDimensionsRef.current[id] = {
+          width: element.offsetWidth,
+          height: element.offsetHeight,
+        };
+        measuredMaskRef.current[id] = true;
+      }
     }
+    return labelDimensionsRef.current[id];
+  }, []);
 
-    if (!visible) {
-      element.style.visibility = 'hidden';
-      return;
+  const updateLabels = useCallback((layouts: readonly ResolvedLabelLayout[]) => {
+    for (let index = 0; index < layouts.length; index += 1) {
+      const layout = layouts[index];
+      const element = labelRefs.current[layout.id];
+      if (!element) {
+        continue;
+      }
+
+      if (layout.inFrustum || layout.visible || layout.suppressed) {
+        element.style.transform = `translate(${layout.x}px, ${layout.y}px) translate(-50%, -100%)`;
+      }
+
+      const nextVisibility = layout.visible ? 'visible' : 'hidden';
+      if (element.style.visibility !== nextVisibility) {
+        element.style.visibility = nextVisibility;
+      }
+
+      const nextPointerEvents = layout.visible ? '' : 'none';
+      if (element.style.pointerEvents !== nextPointerEvents) {
+        element.style.pointerEvents = nextPointerEvents;
+      }
+
+      const nextVisibleAttr = layout.visible ? 'true' : 'false';
+      if (element.dataset.labelVisible !== nextVisibleAttr) {
+        element.dataset.labelVisible = nextVisibleAttr;
+      }
+
+      const nextSuppressedAttr = layout.suppressed ? 'true' : 'false';
+      if (element.dataset.labelSuppressed !== nextSuppressedAttr) {
+        element.dataset.labelSuppressed = nextSuppressedAttr;
+      }
     }
-
-    element.style.visibility = 'visible';
-    element.style.transform = `translate(${x}px, ${y}px) translate(-50%, -100%)`;
   }, []);
 
   return (
@@ -408,7 +526,12 @@ export function SolarSystemViewport({
           focusSignal={focusSignal}
           elapsedDays={elapsedDays}
         />
-        <LabelProjector elapsedDays={elapsedDays} onUpdate={updateLabel} />
+        <LabelProjector
+          elapsedDays={elapsedDays}
+          selectedId={selectedId}
+          getLabelDimensions={getLabelDimensions}
+          onUpdate={updateLabels}
+        />
 
         <Sun selected={selectedId === 'sun'} onSelect={onSelect} />
 
