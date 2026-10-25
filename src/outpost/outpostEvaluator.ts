@@ -148,10 +148,28 @@ export function evaluateOutpostMission(result: OutpostRunResult | null | undefin
     }
   }
 
+  let starsAwarded = 0;
+  let commanderRank = 'Cadet Under Evaluation';
+
+  if (outcome === 'PASS') {
+    starsAwarded = 1;
+    commanderRank = 'Junior Outpost Commander';
+
+    if (finalCropHealth >= 65 && maxRadiation <= 32) {
+      starsAwarded = 2;
+      commanderRank = 'Senior Outpost Commander';
+    }
+
+    if (finalCropHealth >= 80 && maxRadiation <= 26 && finalBatteryPercent >= 15) {
+      starsAwarded = 3;
+      commanderRank = 'Master Outpost Commander';
+    }
+  }
+
   const summary =
     outcome === 'PASS'
       ? 'Outpost nominal: Life support, radiation shielding, power grid, and crops successfully maintained through the crisis.'
-      : 'Outpost failure: Critical safety limits breached during the dust storm / solar flare.';
+      : 'Outpost failure: Critical safety limits breached during the environmental crisis.';
 
   return {
     outcome,
@@ -163,5 +181,7 @@ export function evaluateOutpostMission(result: OutpostRunResult | null | undefin
     finalCropHealthPercent: finalCropHealth,
     finalBatteryPercent,
     debriefNotes,
+    starsAwarded,
+    commanderRank,
   };
 }

@@ -96,3 +96,20 @@ export const CROP_STARVATION_DEATH_SOLS = 3;
 
 /** Minimum crop biomass survival rate for food security pass, percent. */
 export const MIN_PASSING_CROP_HEALTH_PERCENT = 40.0;
+
+/* ---------------------------------------------------- Lunar Base Constants */
+
+/** Moon tactical operational day interval in Earth hours. */
+export const MOON_DAY_HOURS = 24.0;
+
+/** Background galactic cosmic ray (GCR) surface radiation on the Moon (no atmosphere), mSv/day. */
+export const MOON_SURFACE_BACKGROUND_RADIATION_MSV_DAY = 1.10;
+
+/** Unshielded radiation dose rate on the Moon during SPE (no atmosphere), mSv/day. */
+export const MOON_SPE_UNSHIELDED_RADIATION_MSV_DAY = 55.0;
+
+/** Artemis Base Camp surface Kilopower fission reactor baseline output, kW. */
+export const MOON_BASELINE_NUCLEAR_KW = 35.0;
+
+/** Main battery bank capacity for Artemis Lunar Base (high capacity for lunar night), kWh. */
+export const MOON_BASELINE_BATTERY_CAPACITY_KWH = 480.0;

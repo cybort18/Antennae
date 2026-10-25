@@ -63,6 +63,7 @@ import {
 } from './simulation';
 import { SimulationViewport } from './scene/SimulationViewport';
 import { MarsOutpostViewport } from './scene/MarsOutpostViewport';
+import { MoonOutpostViewport } from './scene/MoonOutpostViewport';
 import { spacecraftModelForInputs } from './scene/spacecraftModels';
 import {
   DEFAULT_SCHEMATIC_RATE,
@@ -108,12 +109,19 @@ export default function App({
   const [sidebarLeftOpen, setSidebarLeftOpen] = useState(false);
   const [outpostSol, setOutpostSol] = useState(0);
   const [outpostDustTau, setOutpostDustTau] = useState(0.18);
+  const [outpostSetting, setOutpostSetting] = useState<'mars' | 'moon'>('mars');
+  const [outpostInsolation, setOutpostInsolation] = useState(1.0);
   const referenceData = useMemo(() => loadReferencePresets(), []);
 
-  const handleOutpostSolChange = useCallback((sol: number, dustTau: number) => {
-    setOutpostSol(sol);
-    setOutpostDustTau(dustTau);
-  }, []);
+  const handleOutpostSolChange = useCallback(
+    (sol: number, dustTau: number, setting: 'mars' | 'moon' = 'mars', insolation = 1.0) => {
+      setOutpostSol(sol);
+      setOutpostDustTau(dustTau);
+      setOutpostSetting(setting);
+      setOutpostInsolation(insolation);
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!sidebarLeftOpen) {
@@ -381,8 +389,20 @@ export default function App({
           onChangeMode={handleModeChange}
         />
         <div className="app__body app__body--outpost">
-          <main className="app__viewport" aria-label="Mars Outpost 3D viewport" tabIndex={-1}>
-            <MarsOutpostViewport sol={outpostSol} dustOpacityTau={outpostDustTau} />
+          <main
+            className="app__viewport"
+            aria-label={
+              outpostSetting === 'moon'
+                ? 'Moon Artemis Outpost 3D viewport'
+                : 'Mars Outpost 3D viewport'
+            }
+            tabIndex={-1}
+          >
+            {outpostSetting === 'moon' ? (
+              <MoonOutpostViewport sol={outpostSol} insolationFraction={outpostInsolation} />
+            ) : (
+              <MarsOutpostViewport sol={outpostSol} dustOpacityTau={outpostDustTau} />
+            )}
           </main>
           <aside className="app__column app__column--right" aria-label="Outpost Mission Trainer Console">
             <OutpostMissionPanel onSolChange={handleOutpostSolChange} />

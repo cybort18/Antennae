@@ -30,9 +30,34 @@ export interface DailyEnvironment {
   solarParticleEventActive: boolean;
   /** Diurnal mean surface ambient temperature, degrees Celsius. */
   ambientTemperatureC: number;
+  /** Fraction of unattenuated sunlight available (1.0 = full daylight, 0.0 = deep lunar night). Defaults to 1.0. */
+  solarInsolationFraction?: number;
 }
 
 export type CrewHealthStatus = 'nominal' | 'strained' | 'critical' | 'incapacitated';
+
+export interface DilemmaOption {
+  id: string;
+  label: string;
+  description: string;
+  costDescription: string;
+  applyEffect: (
+    sample: OutpostDailySample,
+    allocation: SubsystemAllocation,
+  ) => {
+    samplePatch: Partial<OutpostDailySample>;
+    eventLog: string;
+  };
+}
+
+export interface IncidentDilemma {
+  id: string;
+  sol: number;
+  title: string;
+  threatType: 'dust' | 'radiation' | 'power' | 'lifeSupport' | 'micrometeoroid';
+  briefing: string;
+  options: [DilemmaOption, DilemmaOption];
+}
 
 export interface OutpostDailySample {
   /** Sol index. */
@@ -93,6 +118,9 @@ export interface OutpostScenario {
 
   /** Environmental conditions scheduled for each Sol of the mission. */
   environmentalSchedule: DailyEnvironment[];
+
+  /** Optional tactical dilemma incidents that trigger on specific Sols. */
+  dilemmas?: IncidentDilemma[];
 }
 
 export interface OutpostRunResult {
@@ -101,6 +129,7 @@ export interface OutpostRunResult {
   samples: OutpostDailySample[];
   completed: boolean;
   terminalReason?: string;
+  resolvedDilemmas?: Record<string, string>;
 }
 
 export type OutpostOutcome = 'PASS' | 'FAIL' | 'NOT_EVALUABLE';
@@ -124,4 +153,6 @@ export interface OutpostEvaluation {
   finalCropHealthPercent: number;
   finalBatteryPercent: number;
   debriefNotes: string[];
+  starsAwarded?: number;
+  commanderRank?: string;
 }

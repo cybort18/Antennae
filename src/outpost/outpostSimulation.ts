@@ -18,6 +18,9 @@ import {
   FOOD_NOMINAL_POWER_KW,
   MARS_SOL_HOURS,
   MARS_SURFACE_BACKGROUND_RADIATION_MSV_SOL,
+  MOON_DAY_HOURS,
+  MOON_SPE_UNSHIELDED_RADIATION_MSV_DAY,
+  MOON_SURFACE_BACKGROUND_RADIATION_MSV_DAY,
   OXYGEN_CRITICAL_PERCENT,
   OXYGEN_NOMINAL_PERCENT,
   OXYGEN_SAFE_MIN_PERCENT,
@@ -35,14 +38,22 @@ import type {
 } from './types';
 
 /**
- * Calculates surface solar output based on atmospheric dust optical depth tau.
- * Models exponential atmospheric extinction along with forward scattering.
+ * Calculates surface solar output based on atmospheric dust optical depth tau
+ * and insolation fraction (for daytime vs polar/lunar shadow).
  */
-export function calculateSolarOutputKw(nominalPeakKw: number, dustTau: number): number {
+export function calculateSolarOutputKw(
+  nominalPeakKw: number,
+  dustTau: number,
+  solarInsolationFraction = 1.0,
+): number {
+  const insolation = Math.max(0, Math.min(1.0, solarInsolationFraction));
+  if (insolation <= 0) {
+    return 0;
+  }
   const safeTau = Math.max(0, dustTau);
   // Extinction factor: clear sky (tau 0.2) ~ 83%, dense storm (tau 0.9) ~ 32%
   const transmissionFactor = Math.max(0.1, Math.exp(-0.95 * safeTau) + 0.08 * (1 - safeTau));
-  return Math.round(nominalPeakKw * transmissionFactor * 100) / 100;
+  return Math.round(nominalPeakKw * transmissionFactor * insolation * 100) / 100;
 }
 
 /**
@@ -83,7 +94,12 @@ export function simulateOutpostDay(
 
   // 1. Generation
   const nuclearKw = scenario.baseNuclearKw;
-  const solarKw = calculateSolarOutputKw(scenario.solarArrayNominalKw, environment.dustOpacityTau);
+  const insolation = environment.solarInsolationFraction ?? 1.0;
+  const solarKw = calculateSolarOutputKw(
+    scenario.solarArrayNominalKw,
+    environment.dustOpacityTau,
+    insolation,
+  );
   const powerGeneratedKw = nuclearKw + solarKw;
 
   if (environment.dustOpacityTau >= 0.7) {
@@ -92,11 +108,16 @@ export function simulateOutpostDay(
     events.push('DUST_STORM_MODERATE');
   }
 
+  if (insolation <= 0.05) {
+    events.push('LUNAR_NIGHT_ACTIVE');
+  }
+
   if (environment.solarParticleEventActive) {
     events.push('SOLAR_PARTICLE_EVENT_ACTIVE');
   }
 
   // 2. Power Demand & Grid Balancing
+  const dayHours = scenario.setting === 'moon' ? MOON_DAY_HOURS : MARS_SOL_HOURS;
   const requestedKw =
     Math.max(0, allocation.lifeSupportKw) +
     Math.max(0, allocation.radiationShieldKw) +
@@ -104,19 +125,19 @@ export function simulateOutpostDay(
     Math.max(0, allocation.auxiliaryKw);
 
   const netPowerKw = powerGeneratedKw - requestedKw;
-  const solEnergyGeneratedKwh = powerGeneratedKw * MARS_SOL_HOURS;
-  const solEnergyRequestedKwh = requestedKw * MARS_SOL_HOURS;
+  const solEnergyGeneratedKwh = powerGeneratedKw * dayHours;
+  const solEnergyRequestedKwh = requestedKw * dayHours;
 
   let batteryStorageKwh = previousSample.batteryStorageKwh;
   let satisfactionRatio = 1.0;
 
   if (netPowerKw >= 0) {
     // Net positive: charge battery
-    const energySurplusKwh = netPowerKw * MARS_SOL_HOURS;
+    const energySurplusKwh = netPowerKw * dayHours;
     batteryStorageKwh = Math.min(scenario.batteryCapacityKwh, batteryStorageKwh + energySurplusKwh);
   } else {
     // Net deficit: draw from battery storage
-    const deficitEnergyKwh = Math.abs(netPowerKw) * MARS_SOL_HOURS;
+    const deficitEnergyKwh = Math.abs(netPowerKw) * dayHours;
     if (batteryStorageKwh >= deficitEnergyKwh) {
       batteryStorageKwh -= deficitEnergyKwh;
     } else {
@@ -154,7 +175,7 @@ export function simulateOutpostDay(
     const deficitFraction = (ECLSS_NOMINAL_POWER_KW - effectiveEclssKw) / ECLSS_NOMINAL_POWER_KW;
     oxygenLevelPercent = Math.max(12.0, oxygenLevelPercent - 1.85 * deficitFraction);
 
-    // Heat loss toward Martian ambient temperature
+    // Heat loss toward ambient temperature
     const tempDelta = cabinTemperatureC - environment.ambientTemperatureC;
     cabinTemperatureC = Math.max(
       environment.ambientTemperatureC,
@@ -170,13 +191,23 @@ export function simulateOutpostDay(
   }
 
   // 4. Radiation Exposure
-  let dailyRadiationDoseMsv = MARS_SURFACE_BACKGROUND_RADIATION_MSV_SOL;
+  const backgroundDose =
+    scenario.setting === 'moon'
+      ? MOON_SURFACE_BACKGROUND_RADIATION_MSV_DAY
+      : MARS_SURFACE_BACKGROUND_RADIATION_MSV_SOL;
+
+  let dailyRadiationDoseMsv = backgroundDose;
 
   if (environment.solarParticleEventActive) {
+    const unshieldedSpeDose =
+      scenario.setting === 'moon'
+        ? MOON_SPE_UNSHIELDED_RADIATION_MSV_DAY
+        : SPE_UNSHIELDED_RADIATION_MSV_SOL;
+
     const shieldFraction = Math.max(0, Math.min(1.0, effectiveShieldKw / SHIELD_NOMINAL_POWER_KW));
     const speDose =
       SPE_SHIELDED_RADIATION_MSV_SOL +
-      (1.0 - shieldFraction) * (SPE_UNSHIELDED_RADIATION_MSV_SOL - SPE_SHIELDED_RADIATION_MSV_SOL);
+      (1.0 - shieldFraction) * (unshieldedSpeDose - SPE_SHIELDED_RADIATION_MSV_SOL);
     dailyRadiationDoseMsv += speDose;
 
     if (shieldFraction < 0.6) {

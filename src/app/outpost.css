@@ -514,3 +514,442 @@
   font-size: 0.72rem;
   color: var(--warn, #efbd61);
 }
+
+/* ------------------------------------------------ Scenario Switcher & Header */
+.outpost-header__top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.outpost-header__actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.outpost-btn-pill {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(133, 164, 194, 0.22);
+  color: var(--text-muted, #9aacbe);
+  font-size: 0.74rem;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.outpost-btn-pill:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  border-color: var(--accent, #7bd7e8);
+}
+
+.outpost-scenario-selector {
+  display: flex;
+  gap: 6px;
+  margin: 6px 0 2px 0;
+  background: rgba(4, 9, 16, 0.6);
+  padding: 3px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.outpost-scenario-tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 10px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  background: transparent;
+  color: var(--text-muted, #9aacbe);
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.outpost-scenario-tab:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.outpost-scenario-tab.is-active {
+  background: rgba(123, 215, 232, 0.12);
+  color: #fff;
+  border-color: rgba(123, 215, 232, 0.35);
+  box-shadow: 0 0 10px rgba(123, 215, 232, 0.15);
+}
+
+.outpost-best-score {
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: #ffd15c;
+  background: rgba(255, 209, 92, 0.08);
+  border: 1px solid rgba(255, 209, 92, 0.25);
+  padding: 3px 8px;
+  border-radius: 4px;
+  align-self: flex-start;
+  margin-top: 2px;
+}
+
+/* ---------------------------------------------------- Tactical Dilemma Card */
+.outpost-dilemma-card {
+  background: linear-gradient(135deg, rgba(38, 14, 18, 0.95), rgba(18, 8, 12, 0.95));
+  border: 1px solid rgba(242, 123, 125, 0.5);
+  box-shadow: 0 0 16px rgba(242, 123, 125, 0.25);
+  border-radius: 8px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  animation: dilemma-fade-in 0.25s ease-out;
+}
+
+@keyframes dilemma-fade-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.outpost-dilemma-badge {
+  display: inline-block;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: #ff8587;
+  background: rgba(255, 100, 100, 0.15);
+  border: 1px solid rgba(255, 100, 100, 0.35);
+  padding: 2px 7px;
+  border-radius: 4px;
+  margin-bottom: 4px;
+}
+
+.outpost-dilemma-title {
+  font-size: 0.98rem;
+  font-weight: 700;
+  color: #fff;
+  margin: 0;
+}
+
+.outpost-dilemma-briefing {
+  font-size: 0.8rem;
+  color: #d1d9e2;
+  line-height: 1.45;
+  margin: 0;
+}
+
+.outpost-dilemma-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+@media (max-width: 600px) {
+  .outpost-dilemma-options {
+    grid-template-columns: 1fr;
+  }
+}
+
+.outpost-dilemma-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 6px;
+  padding: 10px;
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  transition: all 0.18s ease;
+}
+
+.outpost-dilemma-btn:hover {
+  background: rgba(255, 120, 120, 0.15);
+  border-color: #ff8587;
+  transform: translateY(-1px);
+}
+
+.outpost-dilemma-btn__label {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.outpost-dilemma-btn__desc {
+  font-size: 0.74rem;
+  color: #b0c0d0;
+  line-height: 1.35;
+}
+
+.outpost-dilemma-btn__cost {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #ffd15c;
+  margin-top: 2px;
+}
+
+/* ---------------------------------------------------- Modals (Briefing & Cert) */
+.outpost-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(2, 6, 12, 0.82);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  animation: modal-fade 0.2s ease-out;
+}
+
+@keyframes modal-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.outpost-modal {
+  background: #081424;
+  border: 1px solid rgba(123, 215, 232, 0.3);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.85);
+  border-radius: 10px;
+  width: 100%;
+  max-width: 680px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.outpost-modal__header {
+  padding: 20px 24px 14px 24px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.outpost-modal__badge {
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: #7bd7e8;
+}
+
+.outpost-modal__title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #fff;
+  margin: 4px 0;
+}
+
+.outpost-modal__subtitle {
+  font-size: 0.84rem;
+  color: #9aacbe;
+  margin: 0;
+  line-height: 1.45;
+}
+
+.outpost-modal__body {
+  padding: 20px 24px;
+  overflow-y: auto;
+}
+
+.outpost-modal__footer {
+  padding: 14px 24px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  background: rgba(4, 10, 18, 0.5);
+}
+
+/* Briefing Step Cards */
+.briefing-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.briefing-card {
+  display: flex;
+  gap: 14px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 14px;
+}
+
+.briefing-card__num {
+  font-size: 1.1rem;
+  font-weight: 800;
+  font-family: var(--mono);
+  color: #7bd7e8;
+  line-height: 1;
+}
+
+.briefing-card__content {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.briefing-card__title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #fff;
+  margin: 0;
+}
+
+.briefing-card__content p {
+  font-size: 0.82rem;
+  color: #b0c0d2;
+  margin: 0;
+  line-height: 1.45;
+}
+
+.briefing-list {
+  padding-left: 16px;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.8rem;
+  color: #b0c0d2;
+}
+
+.briefing-badge-criteria {
+  margin-top: 6px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: #ffd15c;
+  background: rgba(255, 209, 92, 0.1);
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+/* Certificate Card Styles */
+.certificate-card {
+  text-align: center;
+  padding: 24px;
+  background: linear-gradient(180deg, #061122 0%, #030812 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.certificate-card__badge {
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  color: #7bd7e8;
+}
+
+.certificate-card__title {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #fff;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.certificate-card__stars {
+  font-size: 1.8rem;
+  color: #ffd15c;
+  letter-spacing: 0.2em;
+  line-height: 1;
+  margin: 2px 0;
+}
+
+.certificate-card__rank {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #ffd15c;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.certificate-card__citation {
+  font-size: 0.82rem;
+  color: #9cb4cc;
+  line-height: 1.45;
+  max-width: 480px;
+  margin: 6px 0;
+}
+
+.certificate-card__scenario-box {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 8px 16px;
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.certificate-card__scenario-name {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.certificate-card__scenario-meta {
+  font-size: 0.74rem;
+  color: #7bd7e8;
+}
+
+.certificate-card__metrics-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  width: 100%;
+  margin-top: 10px;
+}
+
+@media (max-width: 500px) {
+  .certificate-card__metrics-row {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.cert-metric {
+  background: rgba(12, 28, 50, 0.6);
+  border: 1px solid rgba(123, 215, 232, 0.2);
+  border-radius: 6px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cert-metric__label {
+  font-size: 0.66rem;
+  font-weight: 700;
+  color: #7bd7e8;
+}
+
+.cert-metric__val {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #fff;
+  font-family: var(--mono);
+}
+
+.outpost-btn--gold {
+  background: linear-gradient(135deg, #c5a059 0%, #e8c378 100%);
+  color: #040d1a;
+  font-weight: 700;
+  border: none;
+  box-shadow: 0 0 12px rgba(232, 195, 120, 0.35);
+}
+
+.outpost-btn--gold:hover {
+  background: linear-gradient(135deg, #d8b266 0%, #f5d48c 100%);
+  transform: translateY(-1px);
+}
+
