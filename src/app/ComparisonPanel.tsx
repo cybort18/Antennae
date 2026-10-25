@@ -14,6 +14,7 @@ import { formatInteger, formatNumber } from '../results/format';
 import { describeWarning } from '../results/labels';
 import { describeScenarioInputs } from '../scenarios/scenarioInputs';
 import { AltitudeChart } from './AltitudeChart';
+import type { ChartGuides } from './altitudeChartMath';
 
 export type ComparisonPanelProps = {
   series: AltitudeSeries[];
@@ -21,6 +22,7 @@ export type ComparisonPanelProps = {
   candidate: ScenarioRecord | null;
   candidateRunState: CandidateRunState;
   bodyRadiusKm: number;
+  guides?: ChartGuides;
 };
 
 function recordFor(role: 'baseline' | 'candidate', baseline: ScenarioRecord, candidate: ScenarioRecord | null) {
@@ -33,6 +35,7 @@ export function ComparisonPanel({
   candidate,
   candidateRunState,
   bodyRadiusKm,
+  guides,
 }: ComparisonPanelProps) {
   const [expanded, setExpanded] = useState(false);
   const candidateMatchesBaseline =
@@ -68,7 +71,7 @@ export function ComparisonPanel({
         className="panel__body comparison-panel__body"
         hidden={!expanded}
       >
-        <AltitudeChart series={series} bodyRadiusKm={bodyRadiusKm} />
+        <AltitudeChart series={series} bodyRadiusKm={bodyRadiusKm} guides={guides} />
 
         <ul className="series-legend">
           {series.map((one) => {

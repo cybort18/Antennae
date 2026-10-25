@@ -85,7 +85,7 @@ describe('Solar System pure schematic motion', () => {
   it('clamps, steps, and advances elapsed schematic time deterministically within [0, 3650]', () => {
     expect(SCHEMATIC_DURATION_MAX_DAYS).toBe(3650);
     expect(SCHEMATIC_STEP_DAYS).toBe(10);
-    expect(SCHEMATIC_RATE_OPTIONS).toEqual([10, 60, 365]);
+    expect(SCHEMATIC_RATE_OPTIONS).toEqual([1, 10, 30, 365]);
 
     expect(clampSchematicDays(-25)).toBe(0);
     expect(clampSchematicDays(120)).toBe(120);

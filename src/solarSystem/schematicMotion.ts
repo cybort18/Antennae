@@ -21,9 +21,9 @@ import {
 
 export const SCHEMATIC_DURATION_MAX_DAYS = 3650;
 export const SCHEMATIC_STEP_DAYS = 10;
-export const SCHEMATIC_RATE_OPTIONS = [10, 60, 365] as const;
+export const SCHEMATIC_RATE_OPTIONS = [1, 10, 30, 365] as const;
 export type SchematicPlaybackRate = (typeof SCHEMATIC_RATE_OPTIONS)[number];
-export const DEFAULT_SCHEMATIC_RATE: SchematicPlaybackRate = 60;
+export const DEFAULT_SCHEMATIC_RATE: SchematicPlaybackRate = 1;
 
 /**
  * Longest real-time delta applied in a single animation frame so a backgrounded

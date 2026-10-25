@@ -12,8 +12,9 @@
  * shell. The simulation is unaffected by either path.
  */
 
-import { memo } from 'react';
-import { AdditiveBlending, BackSide, NoColorSpace } from 'three';
+import { memo, useRef } from 'react';
+import { useFrame } from '@react-three/fiber';
+import { AdditiveBlending, BackSide, Mesh, NoColorSpace } from 'three';
 
 import { useLocalTexture } from './useLocalTexture';
 
@@ -49,6 +50,13 @@ export const EarthSphere = memo(function EarthSphere({
 }) {
   const dayTexture = useLocalTexture(EARTH_DAY_TEXTURE_URL);
   const cloudTexture = useLocalTexture(EARTH_CLOUD_TEXTURE_URL, NoColorSpace);
+  const cloudsRef = useRef<Mesh>(null);
+
+  useFrame((_state, delta) => {
+    if (cloudsRef.current) {
+      cloudsRef.current.rotation.y += 0.012 * delta;
+    }
+  });
 
   return (
     <group name="central-body-earth" rotation={[0, -0.55, 0]}>
@@ -72,7 +80,7 @@ export const EarthSphere = memo(function EarthSphere({
       </mesh>
 
       {dayTexture && cloudTexture ? (
-        <mesh name="central-body-clouds" scale={1.012}>
+        <mesh ref={cloudsRef} name="central-body-clouds" scale={1.012}>
           <sphereGeometry args={[radiusUnits, 64, 48]} />
           <meshStandardMaterial
             alphaMap={cloudTexture}

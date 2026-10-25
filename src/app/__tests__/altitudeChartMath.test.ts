@@ -94,6 +94,16 @@ describe('domains', () => {
     expect(domain.min).toBeLessThanOrEqual(400);
     expect(domain.max).toBeGreaterThanOrEqual(1200);
   });
+
+  it('expands domain to encompass reference values that lie outside the series data', () => {
+    // Series data is tightly clustered at 400 km
+    const series = [seriesWith([[0, 400], [100, 401]])];
+    // Reference values include minimum clearance (200 km) and higher target window (600 km)
+    const domain = altitudeDomain(series, 0.08, [200, 580, 620]);
+
+    expect(domain.min).toBeLessThanOrEqual(200);
+    expect(domain.max).toBeGreaterThanOrEqual(620);
+  });
 });
 
 describe('createAltitudeScale', () => {

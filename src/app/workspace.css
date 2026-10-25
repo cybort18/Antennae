@@ -106,6 +106,10 @@
   min-height: 0;
 }
 
+.app__body--outpost {
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 460px);
+}
+
 .app__column {
   display: flex;
   flex-direction: column;
@@ -841,6 +845,34 @@ select.field__input {
 
 .chart__end-marker--stopped {
   stroke: var(--danger);
+}
+
+.chart__guide-band-rect {
+  fill: rgba(76, 195, 138, 0.08);
+}
+
+.chart__guide-bound-line {
+  stroke: rgba(76, 195, 138, 0.5);
+  stroke-dasharray: 4 3;
+  stroke-width: 1;
+}
+
+.chart__guide-line {
+  stroke: rgba(239, 189, 97, 0.65);
+  stroke-dasharray: 3 3;
+  stroke-width: 1;
+}
+
+.chart__guide-label {
+  fill: rgba(76, 195, 138, 0.85);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+.chart__guide-label--line {
+  fill: rgba(239, 189, 97, 0.85);
 }
 
 .series-legend {

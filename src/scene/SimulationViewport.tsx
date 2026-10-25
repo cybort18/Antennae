@@ -143,7 +143,6 @@ export function SimulationViewport({
           makeDefault
           enableDamping
           dampingFactor={0.08}
-          target={[0, 0, 0]}
           minDistance={bodyRadiusUnits * 1.02}
           maxDistance={cameraFit.maxDistance}
         />

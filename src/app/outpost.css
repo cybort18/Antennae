@@ -1,0 +1,516 @@
+/*
+ * Outpost Mission Trainer Styling.
+ * High-contrast NASA Flight Operations console aesthetics.
+ */
+
+.outpost-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+  background: var(--bg-panel, #08111c);
+  border: 1px solid var(--border, rgba(133, 164, 194, 0.16));
+  border-radius: var(--radius, 6px);
+  color: var(--text, #e7eef6);
+  font-family: inherit;
+}
+
+.outpost-header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.outpost-header__badge {
+  display: inline-block;
+  align-self: flex-start;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent, #7bd7e8);
+  background: rgba(123, 215, 232, 0.12);
+  border: 1px solid rgba(123, 215, 232, 0.28);
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.outpost-header__title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin: 0;
+  color: #fff;
+}
+
+.outpost-header__desc {
+  font-size: 0.82rem;
+  color: var(--text-muted, #9aacbe);
+  line-height: 1.45;
+  margin: 0;
+}
+
+/* Environment Banner */
+.outpost-env-banner {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 8px;
+  background: rgba(11, 23, 36, 0.75);
+  border: 1px solid var(--border, rgba(133, 164, 194, 0.16));
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+
+.outpost-env-banner__col {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.outpost-env-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim, #6c8095);
+}
+
+.outpost-env-value {
+  font-size: 0.88rem;
+  font-weight: 700;
+  font-family: var(--mono);
+}
+
+.outpost-env-value.is-nominal {
+  color: var(--ok, #63d39a);
+}
+
+.outpost-env-value.is-warning {
+  color: var(--danger, #f27b7d);
+  animation: pulse-warn 1.8s infinite ease-in-out;
+}
+
+@keyframes pulse-warn {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.65; }
+}
+
+/* Controls Bar */
+.outpost-controls-bar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.outpost-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 14px;
+  border-radius: 5px;
+  font-size: 0.84rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+}
+
+.outpost-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.outpost-btn--primary {
+  background: #14532d;
+  border-color: #22c55e;
+  color: #f0fdf4;
+}
+
+.outpost-btn--primary:hover:not(:disabled) {
+  background: #166534;
+}
+
+.outpost-btn--secondary {
+  background: #1e3a8a;
+  border-color: #3b82f6;
+  color: #eff6ff;
+}
+
+.outpost-btn--secondary:hover:not(:disabled) {
+  background: #1d4ed8;
+}
+
+.outpost-btn--ghost {
+  background: rgba(133, 164, 194, 0.08);
+  border-color: var(--border, rgba(133, 164, 194, 0.2));
+  color: var(--text-muted, #9aacbe);
+}
+
+.outpost-btn--ghost:hover:not(:disabled) {
+  background: rgba(133, 164, 194, 0.16);
+  color: #fff;
+}
+
+/* Telemetry Grid */
+.outpost-telemetry-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 8px;
+}
+
+.outpost-tile {
+  display: flex;
+  flex-direction: column;
+  padding: 10px 12px;
+  background: rgba(6, 13, 22, 0.85);
+  border: 1px solid var(--border, rgba(133, 164, 194, 0.14));
+  border-radius: 6px;
+}
+
+.outpost-tile__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.outpost-tile__label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-dim, #6c8095);
+}
+
+.outpost-tile__status {
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+.outpost-tile__status.is-ok {
+  color: var(--ok, #63d39a);
+  background: rgba(99, 211, 154, 0.1);
+}
+
+.outpost-tile__status.is-danger {
+  color: var(--danger, #f27b7d);
+  background: rgba(242, 123, 125, 0.15);
+}
+
+.outpost-tile__value {
+  font-size: 1.45rem;
+  font-weight: 700;
+  font-family: var(--mono);
+  color: #fff;
+  line-height: 1.15;
+}
+
+.outpost-tile__unit {
+  font-size: 0.85rem;
+  font-weight: 400;
+  margin-left: 3px;
+  color: var(--text-muted, #9aacbe);
+}
+
+.outpost-tile__meta {
+  font-size: 0.68rem;
+  color: var(--text-dim, #6c8095);
+  margin-top: 4px;
+}
+
+/* Power Monitor */
+.outpost-power-monitor {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  background: rgba(6, 13, 22, 0.85);
+  border: 1px solid var(--border, rgba(133, 164, 194, 0.14));
+  border-radius: 6px;
+}
+
+.outpost-power-monitor__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.outpost-section-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim, #6c8095);
+}
+
+.outpost-power-balance {
+  font-size: 0.78rem;
+  font-family: var(--mono);
+  color: var(--text-muted, #9aacbe);
+}
+
+.outpost-battery-bar {
+  width: 100%;
+  height: 10px;
+  background: rgba(133, 164, 194, 0.12);
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.outpost-battery-fill {
+  height: 100%;
+  background: var(--ok, #63d39a);
+  transition: width 0.3s ease, background-color 0.3s ease;
+}
+
+.outpost-battery-fill.is-warning {
+  background: var(--warn, #efbd61);
+}
+
+.outpost-battery-fill.is-danger {
+  background: var(--danger, #f27b7d);
+}
+
+.outpost-battery-labels {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.76rem;
+  font-family: var(--mono);
+  color: var(--text-muted, #9aacbe);
+}
+
+.text-ok {
+  color: var(--ok, #63d39a);
+}
+
+.text-danger {
+  color: var(--danger, #f27b7d);
+}
+
+/* Subsystem Allocations Console */
+.outpost-allocations {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  background: rgba(6, 13, 22, 0.85);
+  border: 1px solid var(--border, rgba(133, 164, 194, 0.14));
+  border-radius: 6px;
+}
+
+.outpost-allocations__top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.outpost-presets {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.outpost-preset-btn {
+  padding: 3px 8px;
+  font-size: 0.72rem;
+  background: rgba(133, 164, 194, 0.08);
+  border: 1px solid rgba(133, 164, 194, 0.2);
+  border-radius: 4px;
+  color: var(--text-muted, #9aacbe);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.outpost-preset-btn:hover {
+  background: rgba(133, 164, 194, 0.18);
+  color: #fff;
+}
+
+.outpost-slider-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.outpost-slider-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.outpost-slider-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #fff;
+}
+
+.outpost-slider-value {
+  font-size: 0.78rem;
+  font-family: var(--mono);
+  color: var(--accent, #7bd7e8);
+}
+
+.outpost-range {
+  width: 100%;
+  accent-color: var(--accent, #7bd7e8);
+  cursor: pointer;
+}
+
+/* Debrief Evaluation Card */
+.outpost-debrief {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 6px;
+  border: 1px solid;
+}
+
+.outpost-debrief.is-pass {
+  background: rgba(20, 83, 45, 0.18);
+  border-color: rgba(34, 197, 94, 0.35);
+}
+
+.outpost-debrief.is-fail {
+  background: rgba(127, 29, 29, 0.18);
+  border-color: rgba(239, 68, 68, 0.35);
+}
+
+.outpost-debrief__badge {
+  display: inline-block;
+  align-self: flex-start;
+  font-size: 0.86rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 4px 10px;
+  border-radius: 4px;
+}
+
+.outpost-debrief.is-pass .outpost-debrief__badge {
+  background: #14532d;
+  color: #86efac;
+}
+
+.outpost-debrief.is-fail .outpost-debrief__badge {
+  background: #7f1d1d;
+  color: #fca5a5;
+}
+
+.outpost-debrief__summary {
+  font-size: 0.9rem;
+  font-weight: 500;
+  line-height: 1.45;
+  margin: 0;
+}
+
+.outpost-criteria-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.outpost-criterion {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 8px 10px;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 4px;
+}
+
+.outpost-criterion__icon {
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.outpost-criterion__icon.is-pass {
+  color: var(--ok, #63d39a);
+}
+
+.outpost-criterion__icon.is-fail {
+  color: var(--danger, #f27b7d);
+}
+
+.outpost-criterion__body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.8rem;
+}
+
+.outpost-criterion__title {
+  font-weight: 600;
+  color: #fff;
+}
+
+.outpost-criterion__desc {
+  color: var(--text-muted, #9aacbe);
+  font-size: 0.76rem;
+}
+
+.outpost-debrief-notes {
+  margin-top: 4px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.outpost-debrief-notes__title {
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent, #7bd7e8);
+  margin-bottom: 6px;
+}
+
+.outpost-debrief-notes ul {
+  padding-left: 18px;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.outpost-debrief-notes li {
+  font-size: 0.78rem;
+  color: var(--text-muted, #9aacbe);
+  line-height: 1.4;
+  list-style-type: disc;
+}
+
+/* 3D Viewport Watermark */
+.outpost-hud-watermark {
+  position: absolute;
+  top: 16px;
+  left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  pointer-events: none;
+  font-family: var(--mono);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+}
+
+.outpost-hud-watermark__site {
+  font-size: 0.84rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #00ffcc;
+}
+
+.outpost-hud-watermark__coords {
+  font-size: 0.72rem;
+  color: var(--text-muted, #9aacbe);
+}
+
+.outpost-hud-watermark__env {
+  font-size: 0.72rem;
+  color: var(--warn, #efbd61);
+}

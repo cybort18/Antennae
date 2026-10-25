@@ -11,7 +11,7 @@ import { ModeTabs, type WorkspaceMode } from './ModeTabs';
 
 export type TopBarProps = {
   mode: WorkspaceMode;
-  record: ScenarioRecord;
+  record: ScenarioRecord | null;
   view: RecordRole;
   onChangeView: (view: RecordRole) => void;
   candidateAvailable: boolean;
@@ -32,8 +32,8 @@ export function TopBar({
   candidateRunState,
   onChangeMode,
 }: TopBarProps) {
-  const { result } = record;
-  const stopped = result.status === 'stopped';
+  const result = record?.result;
+  const stopped = result?.status === 'stopped';
 
   return (
     <header className="topbar">
@@ -45,58 +45,74 @@ export function TopBar({
 
       <ModeTabs mode={mode} onChange={onChangeMode} />
 
-      <div className="topbar__scenario">
-        <p className="topbar__label" title={result.label}>
-          <span className="topbar__record">{roleLabel(record.role)}</span>
-          {' · '}
-          {result.label ?? 'Unnamed scenario'}
-        </p>
-        <div className="topbar__chips">
-          <Chip tone="neutral" title={describeModel(result.model)}>
-            Two-body model
-          </Chip>
-          {stopped ? (
-            <Chip
-              tone="danger"
-              title={result.stopReason ? describeWarning(result.stopReason) : undefined}
-            >
-              Stopped · {result.stopReason}
-            </Chip>
-          ) : (
-            <Chip tone="ok">Completed</Chip>
-          )}
-          {candidateRunState === 'unrun-changes' ? (
-            <Chip tone="warn" title="Candidate parameters changed since the last candidate run">
-              Unrun changes
-            </Chip>
-          ) : null}
+      {mode === 'outpost' ? (
+        <div className="topbar__scenario">
+          <p className="topbar__label">
+            <span className="topbar__record">Outpost Mission</span>
+            {' · '}
+            Sol 42: The Jezero Outpost Crisis
+          </p>
+          <div className="topbar__chips">
+            <Chip tone="info">Mars Outpost Model</Chip>
+            <Chip tone="neutral">Resource Trade-Off Simulation</Chip>
+          </div>
         </div>
-      </div>
+      ) : record && result ? (
+        <div className="topbar__scenario">
+          <p className="topbar__label" title={result.label}>
+            <span className="topbar__record">{roleLabel(record.role)}</span>
+            {' · '}
+            {result.label ?? 'Unnamed scenario'}
+          </p>
+          <div className="topbar__chips">
+            <Chip tone="neutral" title={describeModel(result.model)}>
+              Two-body model
+            </Chip>
+            {stopped ? (
+              <Chip
+                tone="danger"
+                title={result.stopReason ? describeWarning(result.stopReason) : undefined}
+              >
+                Stopped · {result.stopReason}
+              </Chip>
+            ) : (
+              <Chip tone="ok">Completed</Chip>
+            )}
+            {candidateRunState === 'unrun-changes' ? (
+              <Chip tone="warn" title="Candidate parameters changed since the last candidate run">
+                Unrun changes
+              </Chip>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
 
-      <div className="topbar__view" role="group" aria-label="Displayed trajectory">
-        <span className="topbar__view-label">Trajectory</span>
-        <Button
-          variant={view === 'baseline' ? 'primary' : 'ghost'}
-          ariaPressed={view === 'baseline'}
-          onClick={() => onChangeView('baseline')}
-          title="Display the baseline run in the viewport and timeline"
-        >
-          Baseline
-        </Button>
-        <Button
-          variant={view === 'candidate' ? 'primary' : 'ghost'}
-          ariaPressed={view === 'candidate'}
-          disabled={!candidateAvailable}
-          onClick={() => onChangeView('candidate')}
-          title={
-            candidateAvailable
-              ? 'Display the candidate run in the viewport and timeline'
-              : 'Run a candidate first'
-          }
-        >
-          Candidate
-        </Button>
-      </div>
+      {mode !== 'outpost' ? (
+        <div className="topbar__view" role="group" aria-label="Displayed trajectory">
+          <span className="topbar__view-label">Trajectory</span>
+          <Button
+            variant={view === 'baseline' ? 'primary' : 'ghost'}
+            ariaPressed={view === 'baseline'}
+            onClick={() => onChangeView('baseline')}
+            title="Display the baseline run in the viewport and timeline"
+          >
+            Baseline
+          </Button>
+          <Button
+            variant={view === 'candidate' ? 'primary' : 'ghost'}
+            ariaPressed={view === 'candidate'}
+            disabled={!candidateAvailable}
+            onClick={() => onChangeView('candidate')}
+            title={
+              candidateAvailable
+                ? 'Display the candidate run in the viewport and timeline'
+                : 'Run a candidate first'
+            }
+          >
+            Candidate
+          </Button>
+        </div>
+      ) : null}
     </header>
   );
 }

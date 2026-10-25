@@ -13,7 +13,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Line, OrbitControls, PerspectiveCamera } from '@react-three/drei';
-import { AdditiveBlending, DoubleSide, Vector3 } from 'three';
+import {
+  AdditiveBlending,
+  DoubleSide,
+  Group,
+  Mesh,
+  PointLight,
+  Vector3,
+} from 'three';
 
 import {
   BENNU_MODEL,
@@ -38,97 +45,261 @@ import {
   type ResolvedLabelLayout,
 } from './solarSystemLabels';
 import { useLocalTexture } from './useLocalTexture';
+import {
+  computeOrbitalState,
+  generateOrbitPathScenePoints,
+  heliocentricAuToScene,
+} from '../solarSystem/astronomy';
 
 const ORBIT_SEGMENTS = 160;
+
+const AXIAL_TILTS: Record<SolarSystemBodyId, number> = {
+  sun: 0,
+  mercury: 0.0005,
+  venus: 3.096, // 177.4 deg retrograde
+  earth: 0.4091, // 23.44 deg
+  mars: 0.4396, // 25.19 deg
+  jupiter: 0.0546, // 3.13 deg
+  saturn: 0.4665, // 26.73 deg
+  uranus: 1.7064, // 97.77 deg
+  neptune: 0.4943, // 28.32 deg
+  bennu: 3.096,
+};
+
+const SPIN_RATES: Record<SolarSystemBodyId, number> = {
+  sun: 0.04,
+  mercury: 0.06,
+  venus: -0.05,
+  earth: 0.28,
+  mars: 0.26,
+  jupiter: 0.55,
+  saturn: 0.50,
+  uranus: -0.38,
+  neptune: 0.42,
+  bennu: 0.70,
+};
+
+function getScenePosition(
+  bodyId: SolarSystemBodyId,
+  julianDate?: number,
+  elapsedDays = 0,
+): [number, number, number] {
+  if (bodyId === 'sun') {
+    return [0, 0, 0];
+  }
+  if (typeof julianDate === 'number' && Number.isFinite(julianDate)) {
+    const state = computeOrbitalState(bodyId, julianDate);
+    return heliocentricAuToScene(state.positionAu);
+  }
+  return schematicBodyPosition(bodyId, elapsedDays);
+}
 
 function CameraFocus({
   focusMode,
   selectedId,
   focusSignal,
   elapsedDays,
+  julianDate,
 }: {
   focusMode: CameraFocusMode;
   selectedId: SolarSystemBodyId;
   focusSignal: number;
   elapsedDays: number;
+  julianDate?: number;
 }) {
   const camera = useThree((state) => state.camera);
   const size = useThree((state) => state.size);
   const controls = useThree((state) => state.controls) as
-    | { target: { set: (x: number, y: number, z: number) => void }; update: () => void }
+    | {
+        target: Vector3;
+        addEventListener: (event: string, fn: () => void) => void;
+        removeEventListener: (event: string, fn: () => void) => void;
+      }
     | null;
 
   const elapsedDaysRef = useRef(elapsedDays);
+  const julianDateRef = useRef(julianDate);
   useEffect(() => {
     elapsedDaysRef.current = elapsedDays;
-  }, [elapsedDays]);
+    julianDateRef.current = julianDate;
+  }, [elapsedDays, julianDate]);
 
   const lastTargetRef = useRef<[number, number, number]>(
-    cameraPose(focusMode, selectedId, elapsedDays).target,
+    focusMode === 'body'
+      ? getScenePosition(selectedId, julianDate, elapsedDays)
+      : [0, 0, 0],
   );
 
-  // Explicit camera snap when selection, focusMode, focusSignal, or viewport size changes.
+  // Smooth cinematic camera transition state
+  const initializedRef = useRef(false);
+  const isTransitioningRef = useRef(false);
+  const transitionProgressRef = useRef(1); // 1 = complete
+  const startPosRef = useRef(new Vector3());
+  const startTargetRef = useRef(new Vector3());
+  const endPosRef = useRef(new Vector3());
+  const endTargetRef = useRef(new Vector3());
+
+  // Cancel programmatic camera transition immediately when user begins dragging or interacting
+  useEffect(() => {
+    if (!controls) {
+      return undefined;
+    }
+    const handleUserInteraction = () => {
+      isTransitioningRef.current = false;
+      transitionProgressRef.current = 1;
+    };
+    controls.addEventListener('start', handleUserInteraction);
+    return () => {
+      controls.removeEventListener('start', handleUserInteraction);
+    };
+  }, [controls]);
+
+  // Trigger camera flight transition when selection, focusMode, or focusSignal changes.
   useEffect(() => {
     const pose = cameraPose(focusMode, selectedId, elapsedDaysRef.current);
-    // Narrow canvases have a smaller horizontal field of view. Pull the
-    // overview camera back a little so the outer orbit guides and labels stay
-    // inside the frame; this is framing only.
+    const targetArr =
+      focusMode === 'body'
+        ? getScenePosition(selectedId, julianDateRef.current, elapsedDaysRef.current)
+        : pose.target;
+
     const aspect = size.width / Math.max(size.height, 1);
     const overviewScale =
       focusMode === 'overview' ? Math.min(1.45, Math.max(1, 1.12 / aspect)) : 1;
-    camera.position.set(
-      pose.position[0] * overviewScale,
-      pose.position[1] * overviewScale,
-      pose.position[2] * overviewScale,
-    );
-    camera.lookAt(...pose.target);
-    lastTargetRef.current = [...pose.target];
-    if (controls) {
-      controls.target.set(...pose.target);
-      controls.update();
+
+    let destCamPosArr: [number, number, number];
+    if (focusMode === 'body') {
+      const body = bodyById(selectedId);
+      const distance =
+        selectedId === 'bennu'
+          ? 0.95 + body.displayRadius * 4.5
+          : 1.5 + body.displayRadius * 6.2;
+      const length = Math.hypot(0.37, 0.85, 0.37);
+      destCamPosArr = [
+        targetArr[0] + (0.37 / length) * distance,
+        targetArr[1] + (0.85 / length) * distance,
+        targetArr[2] + (0.37 / length) * distance,
+      ];
+    } else {
+      destCamPosArr = [
+        pose.position[0] * overviewScale,
+        pose.position[1] * overviewScale,
+        pose.position[2] * overviewScale,
+      ];
     }
+
+    if (!initializedRef.current) {
+      camera.position.set(...destCamPosArr);
+      camera.lookAt(...targetArr);
+      lastTargetRef.current = [...targetArr];
+      if (controls) {
+        controls.target.set(...targetArr);
+        initializedRef.current = true;
+      }
+      return;
+    }
+
+    // Set up smooth camera flight
+    startPosRef.current.copy(camera.position);
+    if (controls) {
+      startTargetRef.current.copy(controls.target);
+    } else {
+      startTargetRef.current.set(...lastTargetRef.current);
+    }
+    endPosRef.current.set(...destCamPosArr);
+    endTargetRef.current.set(...targetArr);
+    transitionProgressRef.current = 0;
+    isTransitioningRef.current = true;
+    lastTargetRef.current = [...targetArr];
   }, [camera, controls, focusMode, focusSignal, selectedId, size.height, size.width]);
 
-  // When a planet is focused and schematic time changes, translate the camera and
-  // OrbitControls target by the body's schematic displacement so the camera
-  // follows the moving body while preserving user orbit/zoom adjustments.
-  useEffect(() => {
-    if (focusMode !== 'body') {
-      return;
+  // Frame update: interpolate camera flight or smoothly track orbiting body
+  useFrame((state, delta) => {
+    const frameCamera = state.camera;
+    const frameControls = state.controls as { target: Vector3 } | null;
+
+    if (isTransitioningRef.current) {
+      transitionProgressRef.current = Math.min(1, transitionProgressRef.current + delta * 2.0);
+      const p = transitionProgressRef.current;
+      const t = 1 - Math.pow(1 - p, 3);
+
+      if (focusMode === 'body') {
+        const currentTarget = getScenePosition(selectedId, julianDateRef.current, elapsedDaysRef.current);
+        endTargetRef.current.set(...currentTarget);
+        const body = bodyById(selectedId);
+        const distance =
+          selectedId === 'bennu'
+            ? 0.95 + body.displayRadius * 4.5
+            : 1.5 + body.displayRadius * 6.2;
+        const length = Math.hypot(0.37, 0.85, 0.37);
+        endPosRef.current.set(
+          currentTarget[0] + (0.37 / length) * distance,
+          currentTarget[1] + (0.85 / length) * distance,
+          currentTarget[2] + (0.37 / length) * distance,
+        );
+      }
+
+      frameCamera.position.lerpVectors(startPosRef.current, endPosRef.current, t);
+      if (frameControls) {
+        frameControls.target.lerpVectors(startTargetRef.current, endTargetRef.current, t);
+      } else {
+        frameCamera.lookAt(endTargetRef.current);
+      }
+
+      if (transitionProgressRef.current >= 1) {
+        isTransitioningRef.current = false;
+        lastTargetRef.current = [endTargetRef.current.x, endTargetRef.current.y, endTargetRef.current.z];
+      }
+    } else if (focusMode === 'body') {
+      // Smoothly track orbiting body as simulation date advances
+      const nextTarget = getScenePosition(selectedId, julianDateRef.current, elapsedDaysRef.current);
+      const [prevX, prevY, prevZ] = lastTargetRef.current;
+      const dx = nextTarget[0] - prevX;
+      const dy = nextTarget[1] - prevY;
+      const dz = nextTarget[2] - prevZ;
+      const dist = Math.hypot(dx, dy, dz);
+      if (dist > 1e-12) {
+        lastTargetRef.current = [...nextTarget];
+        if (dist < 2.0) {
+          // Continuous smooth motion: shift camera position and target by the body's delta
+          frameCamera.position.x += dx;
+          frameCamera.position.y += dy;
+          frameCamera.position.z += dz;
+          if (frameControls) {
+            frameControls.target.set(...nextTarget);
+          }
+        } else {
+          // Large date jump: preserve current relative viewing vector without jumping or flinging
+          if (frameControls) {
+            const offsetX = frameCamera.position.x - prevX;
+            const offsetY = frameCamera.position.y - prevY;
+            const offsetZ = frameCamera.position.z - prevZ;
+            frameCamera.position.set(nextTarget[0] + offsetX, nextTarget[1] + offsetY, nextTarget[2] + offsetZ);
+            frameControls.target.set(...nextTarget);
+          }
+        }
+      }
     }
-    const nextTarget = cameraPose('body', selectedId, elapsedDays).target;
-    const [prevX, prevY, prevZ] = lastTargetRef.current;
-    const dx = nextTarget[0] - prevX;
-    const dy = nextTarget[1] - prevY;
-    const dz = nextTarget[2] - prevZ;
-    if (Math.hypot(dx, dy, dz) < 1e-12) {
-      return;
-    }
-    lastTargetRef.current = [...nextTarget];
-    camera.position.set(
-      camera.position.x + dx,
-      camera.position.y + dy,
-      camera.position.z + dz,
-    );
-    if (controls) {
-      controls.target.set(...nextTarget);
-      controls.update();
-    } else {
-      camera.lookAt(...nextTarget);
-    }
-  }, [camera, controls, elapsedDays, focusMode, selectedId]);
+  });
 
   return null;
 }
 
 function OrbitGuide({
   body,
+  julianDate,
   selected,
 }: {
   body: SolarSystemBody;
+  julianDate?: number;
   selected: boolean;
 }) {
   const points = useMemo(() => {
+    if (typeof julianDate === 'number' && Number.isFinite(julianDate) && body.id !== 'sun') {
+      const pathPoints = generateOrbitPathScenePoints(body.id, julianDate, ORBIT_SEGMENTS);
+      if (pathPoints.length > 0) {
+        return pathPoints.map(([x, y, z]) => new Vector3(x, y, z));
+      }
+    }
     const next: Vector3[] = [];
     for (let index = 0; index <= ORBIT_SEGMENTS; index += 1) {
       const angle = (index / ORBIT_SEGMENTS) * Math.PI * 2;
@@ -141,7 +312,7 @@ function OrbitGuide({
       );
     }
     return next;
-  }, [body.orbitRadius]);
+  }, [body.id, body.orbitRadius, julianDate]);
 
   return (
     <Line
@@ -154,15 +325,18 @@ function OrbitGuide({
   );
 }
 
+
 type LabelRefMap = Partial<Record<SolarSystemBodyId, HTMLButtonElement | null>>;
 
 function LabelProjector({
   elapsedDays,
+  julianDate,
   selectedId,
   getLabelDimensions,
   onUpdate,
 }: {
   elapsedDays: number;
+  julianDate?: number;
   selectedId: SolarSystemBodyId;
   getLabelDimensions: (id: SolarSystemBodyId) => { width: number; height: number };
   onUpdate: (layouts: readonly ResolvedLabelLayout[]) => void;
@@ -206,8 +380,8 @@ function LabelProjector({
       candidate.width = dims.width;
       candidate.height = dims.height;
 
-      const [x, , z] = schematicBodyPosition(body.id, elapsedDays);
-      const labelHeight = body.displayRadius + (body.id === 'sun' ? 1.9 : 0.68);
+      const [x, y, z] = getScenePosition(body.id, julianDate, elapsedDays);
+      const labelHeight = y + body.displayRadius + (body.id === 'sun' ? 1.9 : 0.68);
       point.set(x, labelHeight, z).project(camera);
 
       if (point.z < -1 || point.z > 1) {
@@ -254,13 +428,7 @@ function LabelProjector({
   return null;
 }
 
-function SaturnRing({
-  body,
-  position,
-}: {
-  body: SolarSystemBody;
-  position: [number, number, number];
-}) {
+function SaturnRing({ body }: { body: SolarSystemBody }) {
   const ring = body.ring;
   if (!ring) {
     return null;
@@ -280,7 +448,6 @@ function SaturnRing({
           key={`${body.id}-ring-${index}`}
           name={`${body.id}-rings-${index}`}
           rotation={[-Math.PI / 2, 0, 0]}
-          position={position}
           renderOrder={1}
         >
           <ringGeometry args={[body.displayRadius * inner, body.displayRadius * outer, 96]} />
@@ -299,55 +466,88 @@ function SaturnRing({
 
 function PlanetBody({
   body,
-  elapsedDays,
+  position,
   selected,
   onSelect,
 }: {
   body: SolarSystemBody;
-  elapsedDays: number;
+  position: [number, number, number];
   selected: boolean;
   onSelect: (id: SolarSystemBodyId) => void;
 }) {
+  const meshRef = useRef<Mesh>(null);
+  const reticleRef = useRef<Group>(null);
   const texture = useLocalTexture(body.texture?.localPath ?? null);
-  const position = schematicBodyPosition(body.id, elapsedDays);
   const isGasGiant = body.kind === 'gas-giant' || body.kind === 'ice-giant';
   const surface = planetSurfaceState(texture, body.fallbackColor);
 
+  useFrame((_state, delta) => {
+    if (meshRef.current) {
+      const spin = SPIN_RATES[body.id] ?? 0.2;
+      meshRef.current.rotation.y += spin * delta;
+    }
+    if (reticleRef.current && selected) {
+      reticleRef.current.rotation.y += 0.75 * delta;
+      reticleRef.current.rotation.z += 0.35 * delta;
+    }
+  });
+
+  const axialTilt = AXIAL_TILTS[body.id] ?? 0;
+
   return (
-    <group>
-      <mesh
-        name={`overview-${body.id}`}
-        position={position}
-        onClick={(event) => {
-          event.stopPropagation();
-          onSelect(body.id);
-        }}
-      >
-        <sphereGeometry args={[body.displayRadius, 40, 28]} />
-        <meshStandardMaterial
-          key={surface.usesFallback ? 'fallback' : 'texture'}
-          map={surface.map ?? undefined}
-          color={surface.color}
-          roughness={isGasGiant ? 0.76 : 0.93}
-          metalness={0.01}
-          emissive={surface.usesFallback ? '#07121c' : '#02060b'}
-          emissiveIntensity={surface.usesFallback ? 0.22 : 0.12}
-        />
-      </mesh>
-
-      {body.ring ? <SaturnRing body={body} position={position} /> : null}
-
-      {selected ? (
-        <mesh position={position} scale={1.22} renderOrder={0}>
-          <sphereGeometry args={[body.displayRadius, 28, 20]} />
-          <meshBasicMaterial
-            color="#b9f5ff"
-            transparent
-            opacity={0.12}
-            depthWrite={false}
-            blending={AdditiveBlending}
+    <group position={position}>
+      {/* Axial tilt frame for planetary spin and rings */}
+      <group rotation={[axialTilt, 0, 0]}>
+        <mesh
+          ref={meshRef}
+          name={`overview-${body.id}`}
+          onClick={(event) => {
+            event.stopPropagation();
+            onSelect(body.id);
+          }}
+        >
+          <sphereGeometry args={[body.displayRadius, 40, 28]} />
+          <meshStandardMaterial
+            key={surface.usesFallback ? 'fallback' : 'texture'}
+            map={surface.map ?? undefined}
+            color={surface.color}
+            roughness={isGasGiant ? 0.76 : 0.93}
+            metalness={0.01}
+            emissive={surface.usesFallback ? '#07121c' : '#02060b'}
+            emissiveIntensity={surface.usesFallback ? 0.22 : 0.12}
           />
         </mesh>
+
+        {body.ring ? <SaturnRing body={body} /> : null}
+      </group>
+
+      {/* Dynamic Animated Selection Aura & Reticle */}
+      {selected ? (
+        <group ref={reticleRef}>
+          <mesh scale={1.24} renderOrder={0}>
+            <sphereGeometry args={[body.displayRadius, 28, 20]} />
+            <meshBasicMaterial
+              color="#b9f5ff"
+              transparent
+              opacity={0.14}
+              depthWrite={false}
+              blending={AdditiveBlending}
+            />
+          </mesh>
+          <mesh rotation={[Math.PI / 2, 0, 0]}>
+            <ringGeometry
+              args={[body.displayRadius * 1.36, body.displayRadius * 1.44, 48]}
+            />
+            <meshBasicMaterial
+              color="#7bd7e8"
+              transparent
+              opacity={0.6}
+              depthWrite={false}
+              side={DoubleSide}
+              blending={AdditiveBlending}
+            />
+          </mesh>
+        </group>
       ) : null}
     </group>
   );
@@ -361,6 +561,24 @@ function Sun({
   onSelect: (id: SolarSystemBodyId) => void;
 }) {
   const body = bodyById('sun');
+  const coronaRef = useRef<Mesh>(null);
+  const flareRef = useRef<Mesh>(null);
+  const lightRef = useRef<PointLight>(null);
+
+  useFrame((state, delta) => {
+    const t = state.clock.elapsedTime;
+    if (coronaRef.current) {
+      const pulse = 1.18 + Math.sin(t * 1.5) * 0.04;
+      coronaRef.current.scale.set(pulse, pulse, pulse);
+    }
+    if (flareRef.current) {
+      flareRef.current.rotation.z += 0.12 * delta;
+      flareRef.current.rotation.y += 0.06 * delta;
+    }
+    if (lightRef.current) {
+      lightRef.current.intensity = 48 + Math.sin(t * 2.0) * 3.0;
+    }
+  });
 
   return (
     <group>
@@ -374,31 +592,52 @@ function Sun({
         <sphereGeometry args={[body.displayRadius, 48, 32]} />
         <meshBasicMaterial color="#ffd38a" toneMapped={false} />
       </mesh>
-      <mesh scale={1.2}>
+
+      {/* Dynamic Animated Coronal Atmosphere */}
+      <mesh ref={coronaRef} scale={1.2}>
         <sphereGeometry args={[body.displayRadius, 40, 28]} />
         <meshBasicMaterial
           color="#ff9a3c"
           transparent
-          opacity={0.13}
+          opacity={0.15}
           depthWrite={false}
           blending={AdditiveBlending}
           toneMapped={false}
         />
       </mesh>
+
+      {/* Dynamic Solar Flare Ring */}
+      <mesh ref={flareRef} scale={1.35}>
+        <ringGeometry
+          args={[body.displayRadius * 1.05, body.displayRadius * 1.35, 64]}
+        />
+        <meshBasicMaterial
+          color="#ffaa33"
+          transparent
+          opacity={0.07}
+          side={DoubleSide}
+          depthWrite={false}
+          blending={AdditiveBlending}
+          toneMapped={false}
+        />
+      </mesh>
+
       <pointLight
+        ref={lightRef}
         position={[0, 0, 0]}
         color="#ffe0b2"
         intensity={48}
         distance={80}
         decay={2}
       />
+
       {selected ? (
-        <mesh scale={1.38}>
+        <mesh scale={1.42}>
           <sphereGeometry args={[body.displayRadius, 36, 24]} />
           <meshBasicMaterial
             color="#fff0c0"
             transparent
-            opacity={0.1}
+            opacity={0.12}
             depthWrite={false}
             blending={AdditiveBlending}
             toneMapped={false}
@@ -409,11 +648,84 @@ function Sun({
   );
 }
 
+function MotionTrails({
+  julianDate,
+  elapsedDays,
+  selectedId,
+}: {
+  julianDate?: number;
+  elapsedDays: number;
+  selectedId: SolarSystemBodyId;
+}) {
+  const [trailMap, setTrailMap] = useState<Map<SolarSystemBodyId, [number, number, number][]>>(
+    () => new Map(),
+  );
+  const lastTimeRef = useRef<number | null>(null);
+
+  const currentTime =
+    typeof julianDate === 'number' && Number.isFinite(julianDate)
+      ? julianDate
+      : elapsedDays;
+
+  useEffect(() => {
+    setTrailMap((prev) => {
+      const next = new Map(prev);
+      if (lastTimeRef.current !== null && Math.abs(currentTime - lastTimeRef.current) > 2.5) {
+        next.clear();
+      }
+      lastTimeRef.current = currentTime;
+
+      const nonSunBodies = SOLAR_SYSTEM_BODIES.filter((body) => body.id !== 'sun');
+      for (const body of nonSunBodies) {
+        const pos = getScenePosition(body.id, julianDate, elapsedDays);
+        const existing = next.get(body.id) ?? [];
+        const last = existing[existing.length - 1];
+        if (!last || Math.hypot(pos[0] - last[0], pos[1] - last[1], pos[2] - last[2]) > 0.04) {
+          const updated = [...existing, pos];
+          if (updated.length > 36) {
+            updated.shift();
+          }
+          next.set(body.id, updated);
+        }
+      }
+      return next;
+    });
+  }, [currentTime, julianDate, elapsedDays]);
+
+  const nonSunBodies = SOLAR_SYSTEM_BODIES.filter((body) => body.id !== 'sun');
+
+  return (
+    <group>
+      {nonSunBodies.map((body) => {
+        const pts = trailMap.get(body.id) ?? [];
+        if (pts.length < 2) {
+          return null;
+        }
+        const v3Points = pts.map(([x, y, z]) => new Vector3(x, y, z));
+        const isSelected = body.id === selectedId;
+        return (
+          <Line
+            key={`trail-${body.id}`}
+            points={v3Points}
+            color={body.accentColor}
+            transparent
+            opacity={isSelected ? 0.75 : 0.28}
+            lineWidth={isSelected ? 2.0 : 1.0}
+          />
+        );
+      })}
+    </group>
+  );
+}
+
 export type SolarSystemViewportProps = {
   selectedId: SolarSystemBodyId;
   focusMode: CameraFocusMode;
   focusSignal: number;
   elapsedDays?: number;
+  julianDate?: number;
+  showTrails?: boolean;
+  onToggleTrails?: () => void;
   onSelect: (id: SolarSystemBodyId) => void;
   onBennuMeshStatusChange?: (status: BennuMeshStatus) => void;
 };
@@ -423,10 +735,12 @@ export function SolarSystemViewport({
   focusMode,
   focusSignal,
   elapsedDays = 0,
+  julianDate,
+  showTrails = false,
+  onToggleTrails,
   onSelect,
   onBennuMeshStatusChange,
 }: SolarSystemViewportProps) {
-  const initialPose = cameraPose(focusMode, selectedId, elapsedDays);
   const [bennuMeshStatus, setBennuMeshStatus] =
     useState<BennuMeshStatus>('procedural-overview');
   const labelRefs = useRef<LabelRefMap>({});
@@ -531,9 +845,8 @@ export function SolarSystemViewport({
         <PerspectiveCamera
           makeDefault
           fov={42}
-          near={initialPose.near}
-          far={initialPose.far}
-          position={initialPose.position}
+          near={0.1}
+          far={5000}
         />
 
         <CameraFocus
@@ -541,9 +854,11 @@ export function SolarSystemViewport({
           selectedId={selectedId}
           focusSignal={focusSignal}
           elapsedDays={elapsedDays}
+          julianDate={julianDate}
         />
         <LabelProjector
           elapsedDays={elapsedDays}
+          julianDate={julianDate}
           selectedId={selectedId}
           getLabelDimensions={getLabelDimensions}
           onUpdate={updateLabels}
@@ -555,16 +870,18 @@ export function SolarSystemViewport({
           <OrbitGuide
             key={`orbit-${body.id}`}
             body={body}
+            julianDate={julianDate}
             selected={body.id === selectedId}
           />
         ))}
 
-        {SOLAR_SYSTEM_BODIES.filter((body) => body.id !== 'sun').map((body) =>
-          body.id === 'bennu' ? (
+        {SOLAR_SYSTEM_BODIES.filter((body) => body.id !== 'sun').map((body) => {
+          const pos = getScenePosition(body.id, julianDate, elapsedDays);
+          return body.id === 'bennu' ? (
             <BennuAsteroidModel
               key={body.id}
               body={body}
-              position={schematicBodyPosition(body.id, elapsedDays)}
+              position={pos}
               selected={body.id === selectedId}
               focusMode={focusMode}
               onSelect={onSelect}
@@ -574,18 +891,25 @@ export function SolarSystemViewport({
             <PlanetBody
               key={body.id}
               body={body}
-              elapsedDays={elapsedDays}
+              position={pos}
               selected={body.id === selectedId}
               onSelect={onSelect}
             />
-          ),
-        )}
+          );
+        })}
+
+        {showTrails ? (
+          <MotionTrails
+            julianDate={julianDate}
+            elapsedDays={elapsedDays}
+            selectedId={selectedId}
+          />
+        ) : null}
 
         <OrbitControls
           makeDefault
           enableDamping
           dampingFactor={0.08}
-          target={[0, 0, 0]}
           minDistance={0.9}
           maxDistance={100}
         />
@@ -617,16 +941,36 @@ export function SolarSystemViewport({
       </div>
 
       <div className="ss-viewport__overlay ss-viewport__overlay--top-left">
-        <span className="ss-badge">REFERENCE VISUALIZATION</span>
+        <span className="ss-badge">
+          {typeof julianDate === 'number'
+            ? 'ASTRONOMICAL OBSERVATORY'
+            : 'REFERENCE VISUALIZATION'}
+        </span>
         <p className="ss-viewport__hint">
-          {elapsedDays === 0
-            ? 'Static schematic layout · no ephemeris or dynamics'
-            : 'Illustrative schematic motion · not an ephemeris'}
+          {typeof julianDate === 'number'
+            ? 'Standish / JPL Keplerian Positions · J2000 Ecliptic Frame'
+            : elapsedDays === 0
+              ? 'Static schematic layout · no ephemeris or dynamics'
+              : 'Illustrative schematic motion · not an ephemeris'}
         </p>
       </div>
 
       <div className="ss-viewport__overlay ss-viewport__overlay--top-right">
-        <p className="ss-viewport__hint">Drag to orbit · scroll to zoom</p>
+        <div className="ss-viewport__top-right-row">
+          <p className="ss-viewport__hint">Drag to orbit · scroll to zoom</p>
+          {onToggleTrails ? (
+            <button
+              type="button"
+              className={showTrails ? 'ss-trail-btn is-active' : 'ss-trail-btn'}
+              aria-pressed={Boolean(showTrails)}
+              onClick={onToggleTrails}
+              title={showTrails ? 'Disable dynamic motion trails' : 'Enable dynamic motion trails'}
+              data-testid="toggle-trails-btn"
+            >
+              {showTrails ? 'Trails: ON' : 'Trails: OFF'}
+            </button>
+          ) : null}
+        </div>
         {selectedId === 'bennu' && focusMode === 'body' ? (
           <span
             className={
@@ -647,9 +991,15 @@ export function SolarSystemViewport({
       </div>
 
       <div className="ss-viewport__overlay ss-viewport__overlay--bottom-left">
-        <span className="ss-badge ss-badge--muted">NOT TO SCALE</span>
+        <span className="ss-badge ss-badge--muted">
+          {typeof julianDate === 'number'
+            ? 'MONOTONIC POWER-LAW SCALE (r^0.6)'
+            : 'NOT TO SCALE'}
+        </span>
         <p className="ss-viewport__hint">
-          Body sizes, orbit spacing, and positions are composed for legibility.
+          {typeof julianDate === 'number'
+            ? 'Radial distances compressed by power-law for multi-planet legibility. True AU and km shown in details.'
+            : 'Body sizes, orbit spacing, and positions are composed for legibility.'}
         </p>
       </div>
 

@@ -25,6 +25,7 @@ import {
   niceTicks,
   roundCoordinate,
   timeDomain,
+  type ChartGuides,
 } from './altitudeChartMath';
 
 export type AltitudeChartProps = {
@@ -32,15 +33,33 @@ export type AltitudeChartProps = {
   series: AltitudeSeries[];
   /** Reference body radius used to express altitude, km. */
   bodyRadiusKm: number;
+  /** Optional reference guides for mission target window and clearance. */
+  guides?: ChartGuides;
 };
 
-export function AltitudeChart({ series, bodyRadiusKm }: AltitudeChartProps) {
+export function AltitudeChart({ series, bodyRadiusKm, guides }: AltitudeChartProps) {
   const layout = chartLayout();
+
+  const referenceValues = useMemo(() => {
+    if (!guides) {
+      return undefined;
+    }
+    const vals: number[] = [];
+    if (guides.band) {
+      vals.push(guides.band.min, guides.band.max);
+    }
+    if (guides.lines) {
+      for (const line of guides.lines) {
+        vals.push(line.value);
+      }
+    }
+    return vals;
+  }, [guides]);
 
   const { timeScale, altitudeScale, timeTicks, altitudeTicks, timeTickStep, altitudeTickStep } =
     useMemo(() => {
       const time = timeDomain(series);
-      const altitude = altitudeDomain(series);
+      const altitude = altitudeDomain(series, 0.08, referenceValues);
       const nextTimeTicks = niceTicks(time, 6);
       const nextAltitudeTicks = niceTicks(altitude, 5);
 
@@ -58,7 +77,7 @@ export function AltitudeChart({ series, bodyRadiusKm }: AltitudeChartProps) {
             ? Math.abs(nextAltitudeTicks[1] - nextAltitudeTicks[0])
             : undefined,
       };
-    }, [series, layout]);
+    }, [series, layout, referenceValues]);
 
   const drawn = useMemo(
     () =>
@@ -115,6 +134,71 @@ export function AltitudeChart({ series, bodyRadiusKm }: AltitudeChartProps) {
         width={layout.plot.width}
         height={layout.plot.height}
       />
+
+      {/* Optional reference guide band (e.g. Mission target window) */}
+      {guides?.band ? (() => {
+        const yTop = altitudeScale.map(guides.band.max);
+        const yBottom = altitudeScale.map(guides.band.min);
+        const bandY = Math.min(yTop, yBottom);
+        const bandH = Math.abs(yBottom - yTop);
+        return (
+          <g className="chart__guide-band" data-testid="chart-guide-band">
+            <rect
+              className="chart__guide-band-rect"
+              x={layout.plot.left}
+              y={bandY}
+              width={layout.plot.width}
+              height={bandH}
+            />
+            <line
+              className="chart__guide-bound-line"
+              x1={layout.plot.left}
+              x2={layout.plot.right}
+              y1={yTop}
+              y2={yTop}
+            />
+            <line
+              className="chart__guide-bound-line"
+              x1={layout.plot.left}
+              x2={layout.plot.right}
+              y1={yBottom}
+              y2={yBottom}
+            />
+            <text
+              className="chart__guide-label"
+              x={layout.plot.right - 8}
+              y={Math.max(bandY - 4, layout.plot.top + 12)}
+              textAnchor="end"
+            >
+              {guides.band.label}
+            </text>
+          </g>
+        );
+      })() : null}
+
+      {/* Optional reference guide lines (e.g. Minimum clearance) */}
+      {guides?.lines ? guides.lines.map((guide) => {
+        const y = altitudeScale.map(guide.value);
+        return (
+          <g key={guide.label} className="chart__guide-line-group" data-testid="chart-guide-line">
+            <line
+              className="chart__guide-line"
+              x1={layout.plot.left}
+              x2={layout.plot.right}
+              y1={y}
+              y2={y}
+            />
+            <text
+              className="chart__guide-label chart__guide-label--line"
+              x={layout.plot.right - 8}
+              y={y - 4}
+              textAnchor="end"
+            >
+              {guide.label}
+            </text>
+          </g>
+        );
+      }) : null}
 
       {altitudeTicks.map((tick) => {
         const y = altitudeScale.map(tick);

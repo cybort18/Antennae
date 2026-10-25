@@ -12,7 +12,8 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AdditiveBlending, type Object3D } from 'three';
+import { useFrame } from '@react-three/fiber';
+import { AdditiveBlending, type Group, type Mesh, type Object3D } from 'three';
 
 import type {
   CameraFocusMode,
@@ -37,8 +38,16 @@ function ProceduralBennuMesh({
   position: [number, number, number];
   onSelect: (id: SolarSystemBodyId) => void;
 }) {
+  const meshRef = useRef<Mesh>(null);
+  useFrame((_state, delta) => {
+    if (meshRef.current) {
+      meshRef.current.rotation.y += 0.45 * delta;
+    }
+  });
+
   return (
     <mesh
+      ref={meshRef}
       name="overview-bennu-procedural"
       position={position}
       scale={[1.06, 0.88, 1.04]}
@@ -127,6 +136,13 @@ function LazyBennuGlbMesh({
     [normalizedModel],
   );
 
+  const groupRef = useRef<Group>(null);
+  useFrame((_state, delta) => {
+    if (groupRef.current && normalizedModel) {
+      groupRef.current.rotation.y += 0.45 * delta;
+    }
+  });
+
   if (!normalizedModel) {
     return (
       <ProceduralBennuMesh
@@ -139,6 +155,7 @@ function LazyBennuGlbMesh({
 
   return (
     <group
+      ref={groupRef}
       name="overview-bennu-glb"
       position={position}
       onClick={(event) => {

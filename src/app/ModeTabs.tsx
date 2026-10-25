@@ -3,7 +3,7 @@
  * never touches the comparison records, playback cursor, or simulation engine.
  */
 
-export type WorkspaceMode = 'overview' | 'lab' | 'mission';
+export type WorkspaceMode = 'overview' | 'lab' | 'mission' | 'outpost';
 
 export function ModeTabs({
   mode,
@@ -40,6 +40,15 @@ export function ModeTabs({
         title="Mission Designer: objective-driven run of the same two-body engine"
       >
         Mission Designer
+      </button>
+      <button
+        type="button"
+        className={mode === 'outpost' ? 'mode-tabs__tab is-active' : 'mode-tabs__tab'}
+        aria-pressed={mode === 'outpost'}
+        onClick={() => onChange('outpost')}
+        title="Outpost Mission Trainer: balance life support, radiation, power, and food on Mars"
+      >
+        Outpost Trainer
       </button>
     </div>
   );

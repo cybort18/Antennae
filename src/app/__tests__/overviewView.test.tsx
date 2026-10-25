@@ -93,9 +93,12 @@ beforeEach(() => {
   engineProbe.allow = false;
 });
 
+const renderOverview = () =>
+  render(<App initialMode="overview" initialOverviewPlaying={false} />);
+
 describe('Solar System Overview', () => {
   it('lands on the reference overview, not the Earth Orbit Lab', () => {
-    render(<App />);
+    renderOverview();
 
     // The Overview must not instantiate the two-body engine on first load.
     expect(engineProbe.calls).toBe(0);
@@ -152,7 +155,7 @@ describe('Solar System Overview', () => {
 
   it('selects a body, updates its reference details, and resets the camera', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderOverview();
 
     await user.click(screen.getByRole('button', { name: /Jupiter/ }));
 
@@ -236,7 +239,7 @@ describe('Solar System Overview', () => {
 
   it('controls schematic motion deterministically, honors reduced motion, and preserves elapsed days across mode switches without running the physics engine', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderOverview();
 
     const viewport = () => screen.getByTestId('solar-system-viewport-stub');
     const readout = () => screen.getByTestId('schematic-elapsed-readout');
@@ -262,6 +265,7 @@ describe('Solar System Overview', () => {
     expect(screen.getByRole('button', { name: '10 d/s' }).getAttribute('aria-pressed')).toBe('true');
     await user.click(screen.getByRole('button', { name: '365 d/s' }));
     expect(screen.getByRole('button', { name: '365 d/s' }).getAttribute('aria-pressed')).toBe('true');
+    await user.click(screen.getByRole('button', { name: '10 d/s' }));
 
     // Play schematic motion, then switch to Earth Orbit Lab and back
     await user.click(screen.getByRole('button', { name: 'Play schematic motion' }));
@@ -301,7 +305,7 @@ describe('Solar System Overview', () => {
   it('switches to the laboratory and back without discarding comparison records', async () => {
     const user = userEvent.setup();
     engineProbe.allow = true;
-    render(<App />);
+    renderOverview();
 
     await user.click(screen.getByRole('button', { name: 'Earth Orbit Lab' }));
     expect(screen.getByText('Two-body model')).toBeTruthy();
@@ -490,7 +494,7 @@ describe('Solar System Overview', () => {
     // Verify in the DOM that bodies whose projected labels are suppressed at 1825 d remain
     // selectable through the body selector list and update the details panel.
     const user = userEvent.setup();
-    render(<App />);
+    renderOverview();
     const scrubber = screen.getByRole('slider', {
       name: 'Schematic elapsed time (Earth days)',
     });

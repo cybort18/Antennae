@@ -8,7 +8,7 @@
  * two-body engine can be run.
  */
 
-import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from 'react';
+import { useCallback, useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
 
 import { Button, Chip } from '../components/ui';
 import { formatInteger, formatNumber } from '../results/format';
@@ -34,6 +34,15 @@ import {
   stepSchematicDays,
   type SchematicPlaybackRate,
 } from '../solarSystem/schematicMotion';
+import {
+  computeOrbitalState,
+  formatJulianDateUtc,
+  isoDateToJulianDate,
+  julianDateToIsoDate,
+  nowToJulianDate,
+} from '../solarSystem/astronomy';
+import { clampJulianDate } from '../solarSystem/time';
+import { ASTRONOMY_PRESETS, presetById } from '../solarSystem/presets';
 import { ModeTabs, type WorkspaceMode } from './ModeTabs';
 import { type BennuMeshStatus } from '../scene/bennuModel';
 import { SolarSystemViewport } from '../scene/SolarSystemViewport';
@@ -107,19 +116,30 @@ function SelectedBodyPanel({
   selectedId,
   focusMode,
   elapsedDays,
+  simulationJd,
   bennuMeshStatus,
   onResetView,
+  onChangeMode,
 }: {
   selectedId: SolarSystemBodyId;
   focusMode: CameraFocusMode;
   elapsedDays: number;
+  simulationJd: number;
   bennuMeshStatus: BennuMeshStatus;
   onResetView: () => void;
+  onChangeMode: (mode: WorkspaceMode) => void;
 }) {
   const body = bodyById(selectedId);
   const texture = body.texture;
   const model = body.model;
   const { facts } = body;
+
+  const liveState = useMemo(() => {
+    if (selectedId === 'sun' || !Number.isFinite(simulationJd)) {
+      return null;
+    }
+    return computeOrbitalState(selectedId, simulationJd);
+  }, [selectedId, simulationJd]);
 
   return (
     <section
@@ -273,6 +293,33 @@ function SelectedBodyPanel({
               )}
             </dd>
           </div>
+          {liveState ? (
+            <>
+              <div>
+                <dt>Live distance</dt>
+                <dd>
+                  <strong>{`${formatNumber(liveState.distanceAu, 4)} AU`}</strong> (
+                  {formatNumber(liveState.distanceKm / 1000000, 2)}M km)
+                </dd>
+              </div>
+              <div>
+                <dt>Orbital speed</dt>
+                <dd>
+                  <strong>{`${formatNumber(liveState.speedKmS, 2)} km/s`}</strong> (vis-viva)
+                </dd>
+              </div>
+              <div>
+                <dt>True anomaly</dt>
+                <dd>{formatNumber(liveState.trueAnomalyDeg, 1)}°</dd>
+              </div>
+              <div>
+                <dt>J2000 [X, Y, Z]</dt>
+                <dd>
+                  [{formatNumber(liveState.positionAu[0], 2)}, {formatNumber(liveState.positionAu[1], 2)}, {formatNumber(liveState.positionAu[2], 2)}] AU
+                </dd>
+              </div>
+            </>
+          ) : null}
           <div>
             <dt>Fact sources</dt>
             <dd className="ss-facts__sources">
@@ -287,6 +334,22 @@ function SelectedBodyPanel({
             </dd>
           </div>
         </dl>
+
+        {selectedId === 'mars' ? (
+          <div className="overview-mars-portal" data-testid="mars-outpost-portal">
+            <span className="overview-mars-portal__badge">NASA SPACE APPS 2026 CHALLENGE</span>
+            <h4 className="overview-mars-portal__title">Active Capstone Mission: Sol 42 Jezero Outpost Crisis</h4>
+            <p className="overview-mars-portal__desc">
+              Experience the official challenge: manage life support, power grid, water recovery, and food production during severe Martian dust storms.
+            </p>
+            <Button
+              variant="primary"
+              onClick={() => onChangeMode('outpost')}
+            >
+              Launch Outpost Mission Trainer →
+            </Button>
+          </div>
+        ) : null}
 
         {facts.provenanceNote ? (
           <p className="overview-note">{facts.provenanceNote}</p>
@@ -392,20 +455,26 @@ function SchematicMotionStrip({
   elapsedDays,
   playing,
   rateDaysPerSec,
+  simulationJd,
   onReset,
   onTogglePlay,
   onStepDays,
   onScrubDays,
   onChangeRate,
+  onJumpDate,
+  onSelectPreset,
 }: {
   elapsedDays: number;
   playing: boolean;
   rateDaysPerSec: SchematicPlaybackRate;
+  simulationJd: number;
   onReset: () => void;
   onTogglePlay: () => void;
   onStepDays: (deltaDays: number) => void;
   onScrubDays: (nextDays: number) => void;
   onChangeRate: (rate: SchematicPlaybackRate) => void;
+  onJumpDate: (isoDate: string) => void;
+  onSelectPreset: (presetId: string) => void;
 }) {
   const atStart = elapsedDays <= 0;
   const atEnd = elapsedDays >= SCHEMATIC_DURATION_MAX_DAYS - 1e-9;
@@ -421,9 +490,9 @@ function SchematicMotionStrip({
           onClick={onReset}
           disabled={atStart && !playing}
           ariaLabel="Reset schematic motion"
-          title="Reset schematic elapsed time to 0 Earth days"
+          title="Reset simulation time to current system date (Now)"
         >
-          ⟲ Reset
+          ⟲ Now
         </Button>
         <Button
           onClick={() => onStepDays(-SCHEMATIC_STEP_DAYS)}
@@ -454,6 +523,67 @@ function SchematicMotionStrip({
         >
           +10 d
         </Button>
+        <div className="ss-motion__date-picker-wrap">
+          <label htmlFor="ss-date-picker-input" className="ss-motion__date-label">
+            Date
+          </label>
+          <input
+            id="ss-date-picker-input"
+            className="ss-motion__date-picker"
+            type="date"
+            min="1800-01-01"
+            max="2050-12-31"
+            value={julianDateToIsoDate(simulationJd)}
+            aria-label="Jump to simulation date"
+            title="Jump to date between 1800 AD and 2050 AD"
+            onChange={(event) => onJumpDate(event.target.value)}
+          />
+        </div>
+        <div className="ss-motion__preset-wrap">
+          <label htmlFor="ss-preset-select" className="ss-motion__date-label">
+            Preset
+          </label>
+          <select
+            id="ss-preset-select"
+            className="ss-preset-select"
+            aria-label="Verified event presets"
+            defaultValue=""
+            data-testid="astronomy-preset-select"
+            onChange={(event) => {
+              if (event.target.value) {
+                onSelectPreset(event.target.value);
+                event.target.value = '';
+              }
+            }}
+          >
+            <option value="" disabled>
+              Select event...
+            </option>
+            <optgroup label="Astronomical Epochs">
+              {ASTRONOMY_PRESETS.filter((p) => p.category === 'epoch').map((p) => (
+                <option key={p.id} value={p.id} title={p.description}>
+                  {p.label}
+                </option>
+              ))}
+            </optgroup>
+            <optgroup label="Historic NASA Missions">
+              {ASTRONOMY_PRESETS.filter((p) => p.category === 'historic-mission').map((p) => (
+                <option key={p.id} value={p.id} title={p.description}>
+                  {p.label}
+                </option>
+              ))}
+            </optgroup>
+            <optgroup label="Planetary Science & Future">
+              {ASTRONOMY_PRESETS.filter(
+                (p) => p.category === 'planetary-science' || p.category === 'future-mission',
+              ).map((p) => (
+                <option key={p.id} value={p.id} title={p.description}>
+                  {p.label}
+                </option>
+              ))}
+            </optgroup>
+          </select>
+        </div>
       </div>
 
       <div className="ss-motion__track">
@@ -470,6 +600,9 @@ function SchematicMotionStrip({
         <div className="ss-motion__readout">
           <span data-testid="schematic-elapsed-readout">
             Schematic elapsed time: +{formatNumber(elapsedDays, 1)} Earth days
+          </span>
+          <span className="ss-motion__date-readout" data-testid="simulation-date-readout">
+            Date: <strong>{formatJulianDateUtc(simulationJd)}</strong>
           </span>
           <span>
             0–{formatInteger(SCHEMATIC_DURATION_MAX_DAYS)} d (10 Julian years)
@@ -498,6 +631,7 @@ function SchematicMotionStrip({
 
       <div className="ss-motion__disclosure">
         <span className="ss-badge ss-badge--motion">ILLUSTRATIVE MOTION · NOT AN EPHEMERIS</span>
+        <span className="ss-badge ss-badge--motion">STANDISH J2000 (1800–2050 AD)</span>
         <p className="ss-motion__note">{SOLAR_SYSTEM_SCHEMATIC_MOTION_NOTE}</p>
       </div>
     </section>
@@ -512,6 +646,7 @@ export type SolarSystemOverviewProps = {
   rateDaysPerSec?: SchematicPlaybackRate;
   onChangeRateDaysPerSec?: Dispatch<SetStateAction<SchematicPlaybackRate>>;
   onChangeMode: (mode: WorkspaceMode) => void;
+  initialPlaying?: boolean;
 };
 
 export function SolarSystemOverview({
@@ -522,6 +657,7 @@ export function SolarSystemOverview({
   rateDaysPerSec: controlledRateDaysPerSec,
   onChangeRateDaysPerSec,
   onChangeMode,
+  initialPlaying,
 }: SolarSystemOverviewProps) {
   const [focusMode, setFocusMode] = useState<CameraFocusMode>('overview');
   const [focusSignal, setFocusSignal] = useState(0);
@@ -531,14 +667,19 @@ export function SolarSystemOverview({
   const [localRateDaysPerSec, setLocalRateDaysPerSec] =
     useState<SchematicPlaybackRate>(DEFAULT_SCHEMATIC_RATE);
 
-  // Motion is opt-in and always starts paused (including under prefers-reduced-motion: reduce
-  // and when returning from Earth Orbit Lab or Mission Designer).
-  const [playing, setPlaying] = useState(false);
+  const [baseJd, setBaseJd] = useState(() => nowToJulianDate());
+
+  // Decision 1: Solar System playback starts automatically at 1 Earth day per real second
+  // whenever entering Solar System mode, unless configured otherwise.
+  const [playing, setPlaying] = useState(initialPlaying ?? true);
+  const [showTrails, setShowTrails] = useState(false);
 
   const elapsedDays = controlledElapsedDays ?? localElapsedDays;
   const setElapsedDays = onChangeElapsedDays ?? setLocalElapsedDays;
   const rateDaysPerSec = controlledRateDaysPerSec ?? localRateDaysPerSec;
   const setRateDaysPerSec = onChangeRateDaysPerSec ?? setLocalRateDaysPerSec;
+
+  const simulationJd = clampJulianDate(baseJd + elapsedDays);
 
   if (playing && elapsedDays >= SCHEMATIC_DURATION_MAX_DAYS - 1e-9) {
     setPlaying(false);
@@ -573,11 +714,14 @@ export function SolarSystemOverview({
     return () => cancelAnimationFrame(frame);
   }, [playing, rateDaysPerSec, setElapsedDays]);
 
-  const focusBody = (id: SolarSystemBodyId): void => {
-    onSelect(id);
-    setFocusMode('body');
-    setFocusSignal((value) => value + 1);
-  };
+  const focusBody = useCallback(
+    (id: SolarSystemBodyId): void => {
+      onSelect(id);
+      setFocusMode('body');
+      setFocusSignal((value) => value + 1);
+    },
+    [onSelect],
+  );
 
   const resetView = (): void => {
     setFocusMode('overview');
@@ -586,8 +730,22 @@ export function SolarSystemOverview({
 
   const handleResetMotion = useCallback(() => {
     setPlaying(false);
+    setBaseJd(nowToJulianDate());
     setElapsedDays(0);
   }, [setElapsedDays]);
+
+  const handleJumpDate = useCallback(
+    (isoDate: string) => {
+      if (!isoDate) {
+        return;
+      }
+      setPlaying(false);
+      const targetJd = isoDateToJulianDate(isoDate);
+      setBaseJd(targetJd);
+      setElapsedDays(0);
+    },
+    [setElapsedDays],
+  );
 
   const handleTogglePlay = useCallback(() => {
     setPlaying((previous) => {
@@ -616,6 +774,26 @@ export function SolarSystemOverview({
       setElapsedDays(clampSchematicDays(nextDays));
     },
     [setElapsedDays],
+  );
+
+  const handleToggleTrails = useCallback(() => {
+    setShowTrails((previous) => !previous);
+  }, []);
+
+  const handleSelectPreset = useCallback(
+    (presetId: string) => {
+      const preset = presetById(presetId);
+      if (!preset) {
+        return;
+      }
+      setPlaying(false);
+      setBaseJd(preset.julianDate);
+      setElapsedDays(0);
+      if (preset.targetBodyId) {
+        focusBody(preset.targetBodyId);
+      }
+    },
+    [focusBody, setElapsedDays],
   );
 
   const handleModeSelect = useCallback(
@@ -649,6 +827,9 @@ export function SolarSystemOverview({
           focusMode={focusMode}
           focusSignal={focusSignal}
           elapsedDays={elapsedDays}
+          julianDate={simulationJd}
+          showTrails={showTrails}
+          onToggleTrails={handleToggleTrails}
           onSelect={focusBody}
           onBennuMeshStatusChange={setBennuMeshStatus}
         />
@@ -662,8 +843,10 @@ export function SolarSystemOverview({
             selectedId={selectedId}
             focusMode={focusMode}
             elapsedDays={elapsedDays}
+            simulationJd={simulationJd}
             bennuMeshStatus={bennuMeshStatus}
             onResetView={resetView}
+            onChangeMode={handleModeSelect}
           />
         </aside>
       </main>
@@ -672,11 +855,14 @@ export function SolarSystemOverview({
         elapsedDays={elapsedDays}
         playing={playing}
         rateDaysPerSec={rateDaysPerSec}
+        simulationJd={simulationJd}
         onReset={handleResetMotion}
         onTogglePlay={handleTogglePlay}
         onStepDays={handleStepDays}
         onScrubDays={handleScrubDays}
         onChangeRate={setRateDaysPerSec}
+        onJumpDate={handleJumpDate}
+        onSelectPreset={handleSelectPreset}
       />
     </div>
   );

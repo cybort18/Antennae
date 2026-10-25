@@ -12,12 +12,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import './app/workspace.css';
 import './app/solarSystem.css';
+import './app/outpost.css';
 
 import { ObjectBrowser, type Selection } from './app/ObjectBrowser';
 import { ComparisonPanel } from './app/ComparisonPanel';
 import { ComparisonSummary } from './app/ComparisonSummary';
 import { InspectorPanel } from './app/InspectorPanel';
 import { MissionDesignerPanel } from './app/MissionDesignerPanel';
+import { OutpostMissionPanel } from './app/outpost/OutpostMissionPanel';
 import { ModelNotice } from './app/ModelNotice';
 import { PlaybackTimeline } from './app/PlaybackTimeline';
 import { ReferencePresetPanel } from './app/ReferencePresetPanel';
@@ -28,10 +30,13 @@ import { TopBar } from './app/TopBar';
 import { usePlayback } from './app/playback';
 import type { WorkspaceMode } from './app/ModeTabs';
 import {
+  MISSION_ALTITUDE_TOLERANCE_KM,
+  MISSION_MIN_CLEARANCE_KM,
   MISSION_RUN_ORBIT_COUNT,
   MISSION_TARGET_ALTITUDE_DEFAULT_KM,
   evaluateCircularOrbitMission,
   idealCircularStartForMission,
+  missionTargetIsValid,
 } from './missions';
 import {
   altitudeSeries,
@@ -57,12 +62,14 @@ import {
   circularOrbitalPeriodSeconds,
 } from './simulation';
 import { SimulationViewport } from './scene/SimulationViewport';
+import { MarsOutpostViewport } from './scene/MarsOutpostViewport';
 import { spacecraftModelForInputs } from './scene/spacecraftModels';
 import {
   DEFAULT_SCHEMATIC_RATE,
   type SchematicPlaybackRate,
 } from './solarSystem/schematicMotion';
 import type { SolarSystemBodyId } from './solarSystem/bodies';
+import type { ChartGuides } from './app/altitudeChartMath';
 import {
   DEFAULT_SCENARIO_INPUTS,
   INPUT_LIMITS,
@@ -77,9 +84,17 @@ const RECORD_LABEL: Record<RecordRole, string> = {
   candidate: 'Candidate',
 };
 
-export default function App() {
-  const [mode, setMode] = useState<WorkspaceMode>('overview');
-  const [comparison, setComparison] = useState<ComparisonState | null>(null);
+export default function App({
+  initialMode = 'outpost',
+  initialOverviewPlaying = true,
+}: {
+  initialMode?: WorkspaceMode;
+  initialOverviewPlaying?: boolean;
+} = {}) {
+  const [mode, setMode] = useState<WorkspaceMode>(initialMode);
+  const [comparison, setComparison] = useState<ComparisonState | null>(() =>
+    initialMode === 'overview' ? null : initialComparisonState(),
+  );
   const [missionTargetAltitudeKm, setMissionTargetAltitudeKm] = useState(
     MISSION_TARGET_ALTITUDE_DEFAULT_KM,
   );
@@ -87,10 +102,18 @@ export default function App() {
   const [overviewElapsedDays, setOverviewElapsedDays] = useState(0);
   const [overviewRateDaysPerSec, setOverviewRateDaysPerSec] =
     useState<SchematicPlaybackRate>(DEFAULT_SCHEMATIC_RATE);
+  const [overviewPlaying, setOverviewPlaying] = useState(initialOverviewPlaying);
   const [selection, setSelection] = useState<Selection>('particle');
   const [view, setView] = useState<RecordRole>('baseline');
   const [sidebarLeftOpen, setSidebarLeftOpen] = useState(false);
+  const [outpostSol, setOutpostSol] = useState(0);
+  const [outpostDustTau, setOutpostDustTau] = useState(0.18);
   const referenceData = useMemo(() => loadReferencePresets(), []);
+
+  const handleOutpostSolChange = useCallback((sol: number, dustTau: number) => {
+    setOutpostSol(sol);
+    setOutpostDustTau(dustTau);
+  }, []);
 
   useEffect(() => {
     if (!sidebarLeftOpen) {
@@ -106,10 +129,13 @@ export default function App() {
   }, [sidebarLeftOpen]);
 
   const handleModeChange = useCallback((next: WorkspaceMode) => {
-    if (next === 'lab' || next === 'mission') {
+    if (next !== 'overview') {
+      setOverviewPlaying(false);
+    }
+    if (next === 'lab' || next === 'mission' || next === 'outpost') {
       // The baseline is created only when a simulation workspace is first
       // opened. Landing on the reference overview does not execute the engine.
-      // Lab and Mission Designer share the same immutable records so switching
+      // Lab, Mission Designer, and Outpost share records so switching
       // modes can never silently create a second engine or discard a run.
       setComparison((previous) => previous ?? initialComparisonState());
     }
@@ -156,6 +182,25 @@ export default function App() {
     }
     return list;
   }, [baseline, candidate]);
+
+  const chartGuides: ChartGuides | undefined = useMemo(() => {
+    if (mode !== 'mission' || !missionTargetIsValid(missionTargetAltitudeKm)) {
+      return undefined;
+    }
+    return {
+      band: {
+        label: `Target window ±${MISSION_ALTITUDE_TOLERANCE_KM} km (${missionTargetAltitudeKm - MISSION_ALTITUDE_TOLERANCE_KM}–${missionTargetAltitudeKm + MISSION_ALTITUDE_TOLERANCE_KM} km)`,
+        min: missionTargetAltitudeKm - MISSION_ALTITUDE_TOLERANCE_KM,
+        max: missionTargetAltitudeKm + MISSION_ALTITUDE_TOLERANCE_KM,
+      },
+      lines: [
+        {
+          label: `Minimum clearance ${MISSION_MIN_CLEARANCE_KM} km`,
+          value: MISSION_MIN_CLEARANCE_KM,
+        },
+      ],
+    };
+  }, [mode, missionTargetAltitudeKm]);
 
   const aggregates = useMemo(
     () => (displayed ? runAggregates(displayed.result, EARTH_MEAN_RADIUS_KM) : null),
@@ -317,7 +362,33 @@ export default function App() {
         rateDaysPerSec={overviewRateDaysPerSec}
         onChangeRateDaysPerSec={setOverviewRateDaysPerSec}
         onChangeMode={handleModeChange}
+        initialPlaying={overviewPlaying}
       />
+    );
+  }
+
+  if (mode === 'outpost') {
+    const fallbackRecord = displayed ?? (baseline as any);
+    return (
+      <div className="app app--outpost" data-mode="outpost">
+        <TopBar
+          mode="outpost"
+          record={fallbackRecord}
+          view="baseline"
+          onChangeView={() => {}}
+          candidateAvailable={false}
+          candidateRunState="not-run"
+          onChangeMode={handleModeChange}
+        />
+        <div className="app__body app__body--outpost">
+          <main className="app__viewport" aria-label="Mars Outpost 3D viewport" tabIndex={-1}>
+            <MarsOutpostViewport sol={outpostSol} dustOpacityTau={outpostDustTau} />
+          </main>
+          <aside className="app__column app__column--right" aria-label="Outpost Mission Trainer Console">
+            <OutpostMissionPanel onSolChange={handleOutpostSolChange} />
+          </aside>
+        </div>
+      </div>
     );
   }
 
@@ -451,6 +522,7 @@ export default function App() {
           candidate={candidate}
           candidateRunState={draftState}
           bodyRadiusKm={EARTH_MEAN_RADIUS_KM}
+          guides={chartGuides}
         />
 
         <aside className="app__column app__column--right" aria-label="Mission or inspector and results">

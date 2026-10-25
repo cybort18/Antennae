@@ -24,6 +24,22 @@ export type ChartLayout = {
   plot: { left: number; right: number; top: number; bottom: number; width: number; height: number };
 };
 
+export type ChartGuide = {
+  label: string;
+  value: number;
+};
+
+export type ChartGuideBand = {
+  label: string;
+  min: number;
+  max: number;
+};
+
+export type ChartGuides = {
+  band?: ChartGuideBand;
+  lines?: ChartGuide[];
+};
+
 /** Layout used by the SVG chart. Exported so tests can reproduce the geometry. */
 export function chartLayout(width = 760, height = 200): ChartLayout {
   const margin = { top: 16, right: 24, bottom: 44, left: 72 };
@@ -46,7 +62,11 @@ export function timeDomain(series: AltitudeSeries[]): Domain {
   return { min: 0, max: max > 0 ? max : 1 };
 }
 
-export function altitudeDomain(series: AltitudeSeries[], paddingFraction = 0.08): Domain {
+export function altitudeDomain(
+  series: AltitudeSeries[],
+  paddingFraction = 0.08,
+  referenceValues?: number[],
+): Domain {
   let min = Number.POSITIVE_INFINITY;
   let max = Number.NEGATIVE_INFINITY;
 
@@ -57,6 +77,19 @@ export function altitudeDomain(series: AltitudeSeries[], paddingFraction = 0.08)
       }
       if (point.altitudeKm > max) {
         max = point.altitudeKm;
+      }
+    }
+  }
+
+  if (referenceValues) {
+    for (const val of referenceValues) {
+      if (Number.isFinite(val)) {
+        if (val < min) {
+          min = val;
+        }
+        if (val > max) {
+          max = val;
+        }
       }
     }
   }

@@ -57,7 +57,7 @@ import {
 afterEach(cleanup);
 
 function renderMission(): void {
-  render(<App />);
+  render(<App initialMode="overview" initialOverviewPlaying={false} />);
   fireEvent.click(screen.getByRole('button', { name: 'Mission Designer' }));
 }
 
@@ -206,5 +206,34 @@ describe('Mission Designer', () => {
     expect(screen.getByText(/render-only mesh · no physical effect/)).toBeTruthy();
     expect(screen.getAllByText(/NASA GOES Spacecraft 3D Model/).length).toBeGreaterThan(0);
     expect(outcome().dataset.status).toBe('fail');
+  }, 20000);
+
+  it('provides collapsible comparison chart access in Mission Designer with target window and clearance guides', async () => {
+    const user = userEvent.setup();
+    renderMission();
+
+    const body = document.getElementById('comparison-chart-body');
+    const toggle = screen.getByRole('button', { name: 'Show chart' });
+
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    expect(body?.hasAttribute('hidden')).toBe(true);
+
+    // Toggle open the chart
+    await user.click(toggle);
+
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    expect(body?.hasAttribute('hidden')).toBe(false);
+    expect(screen.getByRole('button', { name: 'Hide chart' })).toBeTruthy();
+    expect(screen.getByTestId('altitude-chart')).toBeTruthy();
+
+    // Verify mission threshold guides
+    expect(screen.getByTestId('chart-guide-band')).toBeTruthy();
+    expect(screen.getByText(/Target window ±20 km/)).toBeTruthy();
+    expect(screen.getByTestId('chart-guide-line')).toBeTruthy();
+    expect(screen.getByText(/Minimum clearance 200 km/)).toBeTruthy();
+
+    // Change target altitude to 600 km and verify guide label updates dynamically
+    await setNumber(user, /Target altitude/, '600');
+    expect(screen.getByText(/Target window ±20 km \(580–620 km\)/)).toBeTruthy();
   }, 20000);
 });

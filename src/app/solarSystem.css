@@ -27,6 +27,7 @@
   letter-spacing: 0.02em;
   line-height: 1.2;
   cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .mode-tabs__tab:hover {
@@ -36,8 +37,8 @@
 
 .mode-tabs__tab.is-active {
   color: var(--accent-soft);
-  background: rgba(123, 215, 232, 0.13);
-  box-shadow: inset 0 0 0 1px rgba(123, 215, 232, 0.18);
+  background: rgba(123, 215, 232, 0.14);
+  box-shadow: inset 0 0 0 1px rgba(123, 215, 232, 0.28), 0 0 12px rgba(123, 215, 232, 0.15);
 }
 
 /* ------------------------------------------------------------------ shell */
@@ -688,3 +689,206 @@
     display: none;
   }
 }
+
+/* ----------------------------------------------------- date picker & observatory controls */
+
+.ss-motion__date-picker-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 4px;
+}
+
+.ss-motion__date-label {
+  font-size: 0.68rem;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.ss-motion__date-picker {
+  background: rgba(14, 23, 38, 0.9);
+  border: 1px solid rgba(133, 164, 194, 0.28);
+  color: #e0f2fe;
+  border-radius: 4px;
+  padding: 3px 6px;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.ss-motion__date-picker:focus {
+  border-color: var(--accent, #38bdf8);
+}
+
+.ss-motion__date-readout {
+  color: #38bdf8;
+}
+
+.ss-motion__date-readout strong {
+  animation: dateReadoutPulse 2.4s ease-in-out infinite;
+  display: inline-block;
+}
+
+/* ----------------------------------------------------- Mars Space Apps Challenge Portal */
+
+.overview-mars-portal {
+  margin-top: 14px;
+  padding: 12px 14px;
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.12) 0%, rgba(185, 28, 28, 0.04) 100%);
+  border: 1px solid rgba(239, 68, 68, 0.38);
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25), 0 0 14px rgba(239, 68, 68, 0.12);
+  animation: marsPortalGlow 3.6s ease-in-out infinite;
+  position: relative;
+  overflow: hidden;
+}
+
+.overview-mars-portal::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 60%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(254, 202, 202, 0.08), transparent);
+  animation: radarSweep 4.2s linear infinite;
+  pointer-events: none;
+}
+
+.overview-mars-portal__badge {
+  display: inline-block;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #fca5a5;
+  background: rgba(153, 27, 27, 0.45);
+  border: 1px solid rgba(248, 113, 113, 0.55);
+  padding: 2px 6px;
+  border-radius: 3px;
+  margin-bottom: 6px;
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.22);
+}
+
+.overview-mars-portal__title {
+  margin: 0 0 6px 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #fef2f2;
+  line-height: 1.3;
+}
+
+.overview-mars-portal__desc {
+  margin: 0 0 10px 0;
+  font-size: 0.72rem;
+  color: #cbd5e1;
+  line-height: 1.4;
+}
+
+.overview-mars-portal .button {
+  width: 100%;
+  justify-content: center;
+  background: #b91c1c !important;
+  border-color: #ef4444 !important;
+  color: #fff !important;
+  font-weight: 600;
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.35);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.overview-mars-portal .button:hover {
+  background: #dc2626 !important;
+  box-shadow: 0 0 22px rgba(239, 68, 68, 0.6);
+  transform: translateY(-1px);
+}
+
+.ss-viewport__top-right-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ss-trail-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(14, 23, 38, 0.85);
+  border: 1px solid rgba(133, 164, 194, 0.35);
+  color: #94a3b8;
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  padding: 3px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  line-height: 1.2;
+}
+
+.ss-trail-btn:hover {
+  border-color: var(--accent, #38bdf8);
+  color: #f1f5f9;
+  transform: translateY(-1px);
+}
+
+.ss-trail-btn.is-active {
+  background: rgba(56, 189, 248, 0.16);
+  border-color: #38bdf8;
+  color: #38bdf8;
+  font-weight: 600;
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.25);
+}
+
+.ss-preset-select {
+  background: rgba(14, 23, 38, 0.9);
+  border: 1px solid rgba(133, 164, 194, 0.32);
+  color: #e0f2fe;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  padding: 3px 6px;
+  border-radius: 4px;
+  outline: none;
+  cursor: pointer;
+  max-width: 175px;
+  text-overflow: ellipsis;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.ss-preset-select:focus {
+  border-color: var(--accent, #38bdf8);
+  box-shadow: 0 0 8px rgba(56, 189, 248, 0.3);
+}
+
+/* ----------------------------------------------------- Dynamic Keyframes */
+
+@keyframes marsPortalGlow {
+  0%, 100% {
+    border-color: rgba(239, 68, 68, 0.35);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25), 0 0 12px rgba(239, 68, 68, 0.1);
+  }
+  50% {
+    border-color: rgba(248, 113, 113, 0.65);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25), 0 0 20px rgba(239, 68, 68, 0.28);
+  }
+}
+
+@keyframes radarSweep {
+  0% {
+    left: -80%;
+  }
+  100% {
+    left: 180%;
+  }
+}
+
+@keyframes dateReadoutPulse {
+  0%, 100% {
+    color: #38bdf8;
+    text-shadow: 0 0 0 rgba(56, 189, 248, 0);
+  }
+  50% {
+    color: #bae6fd;
+    text-shadow: 0 0 8px rgba(56, 189, 248, 0.5);
+  }
+}
+
