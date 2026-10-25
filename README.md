@@ -1,14 +1,10 @@
 # Antennae — Space Sandbox
 
-Antennae is a browser-based educational space-physics sandbox. It opens on a schematic **Solar System
-Overview** with the Sun, eight planets, and near-Earth asteroid **101955 Bennu**, then switches to an
-**Earth Orbit Lab** that simulates a massless test particle orbiting Earth under simplified two-body point-mass
-gravity, draws the trajectory the engine actually recorded in a 3D workspace, replays those samples as a
-timeline, and compares a baseline run with a modified candidate run through a computed altitude-versus-time
-chart. A third surface, the **Mission Designer**, turns the same recorded runs into an objective-driven result
-for one circular Earth-orbit template. The Lab also loads one cached JPL Horizons reference state for GOES-16
-with visible provenance and runs it as a clearly labelled hypothetical two-body initial condition; a locally
-served, render-only NASA GOES spacecraft mesh marks that reference when it is displayed.
+Antennae is a browser-based educational space-physics sandbox and mission trainer. It features four distinct active surfaces:
+1. **Solar System Overview:** A schematic 3D Orrery visualization of the Sun, eight planets, and near-Earth asteroid **101955 Bennu** with period-proportional illustrative motion.
+2. **Earth Orbit Lab:** An open orbital physics sandbox simulating a massless test particle orbiting Earth under deterministic two-body Newtonian gravity, with sample-quantized playback, baseline vs. candidate comparisons, an altitude-versus-time chart, and one cached JPL Horizons GOES-16 reference state.
+3. **Mission Designer:** An objective-driven challenge (*Design a Stable Circular Earth Orbit*) evaluated strictly from recorded physics simulation samples.
+4. **Outpost Mission Trainer:** A dedicated survival and resource-management simulation answering the NASA Space Apps Challenge *Build a Junior Astronaut Mission Trainer*, featuring 14-Sol planetary missions on Mars and the Moon, dynamic energy bus balancing, interactive SVG multi-metric timeline charting, and physical causal diagnostics.
 
 It is a learning and demonstration tool. It is **not** flight software, a navigation tool, or an
 impact-prediction service. The Overview is a schematic reference visualization with opt-in,
@@ -70,6 +66,15 @@ period-proportional illustrative motion, not a planetary dynamics model or a dat
   request is made at runtime. When a GOES-16 reference or reference-derived record is displayed, the viewport
   lazily loads one official NASA GOES spacecraft GLB as a **render-only** marker; it adds no mass, attitude,
   thrust, or dynamics, and a failed load falls back to the particle marker.
+- **Outpost Mission Trainer (Junior Astronaut Mission Trainer)** (`src/outpost/`, `src/app/outpost/`, `src/scene/`):
+  Directly addresses the official NASA Space Apps Challenge *Build a Junior Astronaut Mission Trainer*. It provides an educational, deterministic surface habitat resource-management and survival simulation across 14 Sols for two distinct planetary environments:
+  - **Mars Jezero Crater Outpost Alpha** (`18.38°N 77.58°E`): Simulates surface atmospheric dust opacity variations ($\tau \in [0.18, 2.85]$), dust accumulation on solar arrays ($I_{\text{eff}} = I_0 e^{-\tau}$), life support (ECLSS) power requirements, an SPE space-weather solar radiation flare event, and agricultural hydroponics lighting/CO2 scrubbers.
+  - **Moon Artemis South Pole Endurance** (`89.9°S 0.0°E`, Shackleton Crater rim): Simulates deep cryogenic lunar night (220 K drop), zero solar irradiance for 14 Sols, primary reliance on a 40 kW MMRTG nuclear generator, active thermal heating management, and lunar regolith shielding.
+  - **Live Power Flow Diagram** (`src/app/outpost/PowerFlowDiagram.tsx`): Real-time energy balance visualizer displaying generation sources (Solar + MMRTG), central distribution bus balance, battery charging/discharging states, and subsystem loads.
+  - **14-Sol Multi-Metric Timeline SVG Chart** (`src/app/outpost/OutpostHistoryChart.tsx`): Interactive timeline tracking Battery %, Crop Health %, Cumulative Radiation mSv, and Cabin O2 %, complete with safety threshold indicators, legend toggles, and Sol-by-Sol cursor inspection.
+  - **Causal Diagnostics Engine & Flight Director Analysis** (`src/outpost/outpostDiagnostics.ts`, `src/app/outpost/CausalDiagnosticsCard.tsx`): Rule-based causal reasoning explaining physical cause-and-effect behind system stresses (e.g. why hypoxia occurs when power drops, how dust storms reduce solar irradiance, how magnetic shielding mitigates SPE flares), offering tactical flight director advice derived strictly from physical equations.
+  - **Tactical Mid-Mission Dilemmas**: Sol 7 emergency events (e.g. "The Storm Peak Emergency", "Cryogenic Lock") forcing cadets to make principled trade-offs between scientific sample preservation, crew safety, and battery reserves.
+  - **Interactive Procedural Audio Feedback** (`src/audio/outpostAudio.ts`): Built-in Web Audio API synthesizers producing authentic telemetry pings, power brownout alerts, solar flare sirens, and mission success chimes, fully toggleable and accessible.
 - **Honest failure surfaces**: invalid parameters show the engine's own validation messages and change
   nothing; a stopped run keeps its status and warning and is never extended or animated as if it completed;
   values that cannot be derived are reported as unavailable. Mission outcomes use the same rule: an
@@ -172,7 +177,7 @@ publication.
 | `npm run build` | Type-check and produce a production bundle in `dist/` |
 | `npm run preview` | Serve the production build locally |
 
-Current verification (2026-10-24): `npm test` reports 262 passing tests in 29 files and `npm run
+Current verification (2026-10-25): `npm test` reports 343 passing tests in 41 files and `npm run
 typecheck`, `npm run lint`, and `npm run build` exit 0. Re-run the commands rather than trusting those
 numbers; the automated tests cover the physics core, the scenario bridge, result summaries, the comparison
 math, the cached reference parser/provenance, texture-load fallback handling, the Solar System body

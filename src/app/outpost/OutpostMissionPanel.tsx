@@ -26,8 +26,12 @@ import {
   toggleAudioMute,
 } from '../../audio/outpostAudio';
 import { getMissionRecord, saveMissionRecord } from '../../outpost/persistence';
+import { diagnoseOutpostState } from '../../outpost/outpostDiagnostics';
 import { JuniorAstronautBriefingModal } from './JuniorAstronautBriefingModal';
 import { MissionCertificateModal } from './MissionCertificateModal';
+import { CausalDiagnosticsCard } from './CausalDiagnosticsCard';
+import { PowerFlowDiagram } from './PowerFlowDiagram';
+import { OutpostHistoryChart } from './OutpostHistoryChart';
 
 const DEFAULT_ALLOCATION: SubsystemAllocation = {
   lifeSupportKw: 16.0,
@@ -74,6 +78,7 @@ export function OutpostMissionPanel({ onSolChange }: OutpostMissionPanelProps) {
   const [showBriefingModal, setShowBriefingModal] = useState(false);
   const [showCertificateModal, setShowCertificateModal] = useState(false);
   const [audioMuted, setAudioMutedState] = useState<boolean>(() => isAudioMuted());
+  const [activeViewTab, setActiveViewTab] = useState<'console' | 'power' | 'chart'>('console');
 
   const latestSample = samples[samples.length - 1];
   const isMissionFinished = currentSol >= scenario.durationSols || latestSample.crewStatus === 'incapacitated';
@@ -309,6 +314,8 @@ export function OutpostMissionPanel({ onSolChange }: OutpostMissionPanelProps) {
       ? scenario.environmentalSchedule[currentSol - 1]
       : scenario.environmentalSchedule[0];
 
+  const diagnostics = diagnoseOutpostState(latestSample, allocation, currentEnv, scenario);
+
   return (
     <div className="outpost-panel" role="region" aria-label="Outpost Mission Trainer Console">
       {/* Onboarding & Certificate Modals */}
@@ -338,7 +345,7 @@ export function OutpostMissionPanel({ onSolChange }: OutpostMissionPanelProps) {
               title="Open Junior Astronaut mission training briefing"
               aria-label="Open Junior Astronaut Mission Guide"
             >
-              📖 Mission Guide
+              Mission Guide
             </button>
             <button
               type="button"
@@ -347,7 +354,7 @@ export function OutpostMissionPanel({ onSolChange }: OutpostMissionPanelProps) {
               title={audioMuted ? 'Unmute procedural audio' : 'Mute audio'}
               aria-label={audioMuted ? 'Unmute sound effects' : 'Mute sound effects'}
             >
-              {audioMuted ? '🔇 Audio Off' : '🔊 Audio On'}
+              {audioMuted ? 'Audio: Off' : 'Audio: On'}
             </button>
           </div>
         </div>
@@ -367,9 +374,7 @@ export function OutpostMissionPanel({ onSolChange }: OutpostMissionPanelProps) {
               }
               onClick={() => handleScenarioChange(sc.id)}
             >
-              <span className="outpost-scenario-tab__icon">
-                {sc.setting === 'mars' ? '🔴' : '⚪'}
-              </span>
+              <span className={`outpost-scenario-dot outpost-scenario-dot--${sc.setting}`} />
               <span className="outpost-scenario-tab__name">
                 {sc.setting === 'mars' ? 'Mars Jezero Crisis' : 'Moon Artemis Endurance'}
               </span>
@@ -382,7 +387,7 @@ export function OutpostMissionPanel({ onSolChange }: OutpostMissionPanelProps) {
 
         {bestRecord && bestRecord.outcome === 'PASS' ? (
           <div className="outpost-best-score">
-            <span>🏆 Best Record: {'★'.repeat(bestRecord.starsAwarded)} {bestRecord.commanderRank}</span>
+            <span>Record: {'★'.repeat(bestRecord.starsAwarded)} {bestRecord.commanderRank}</span>
           </div>
         ) : null}
       </div>
@@ -420,16 +425,19 @@ export function OutpostMissionPanel({ onSolChange }: OutpostMissionPanelProps) {
                 : 'outpost-env-value is-nominal'
             }
           >
-            {currentEnv.solarParticleEventActive ? '⚠️ SPE FLARE ACTIVE' : 'NOMINAL (GCR)'}
+            {currentEnv.solarParticleEventActive ? 'SPE FLARE ACTIVE' : 'NOMINAL (GCR)'}
           </span>
         </div>
       </div>
+
+      {/* Flight Director Causal Diagnostics ("Why Did This Happen?") */}
+      <CausalDiagnosticsCard diagnostics={diagnostics} />
 
       {/* Incident Tactical Dilemma Alert Card (When active) */}
       {activeDilemma ? (
         <div className="outpost-dilemma-card" role="alert" aria-live="assertive">
           <div className="outpost-dilemma-card__header">
-            <span className="outpost-dilemma-badge">⚠️ COMMAND DILEMMA · SOL {activeDilemma.sol}</span>
+            <span className="outpost-dilemma-badge">COMMAND DILEMMA · SOL {activeDilemma.sol}</span>
             <h3 className="outpost-dilemma-title">{activeDilemma.title}</h3>
             <p className="outpost-dilemma-briefing">{activeDilemma.briefing}</p>
           </div>
@@ -484,13 +492,56 @@ export function OutpostMissionPanel({ onSolChange }: OutpostMissionPanelProps) {
               setShowCertificateModal(true);
             }}
           >
-            🎖️ View Certificate
+            View Certificate
           </button>
         ) : null}
       </div>
 
-      {/* Real-Time Primary Subsystem Telemetry */}
-      <div className="outpost-telemetry-grid">
+      {/* View Mode Navigation Tabs */}
+      <div className="outpost-view-tabs" role="tablist" aria-label="Outpost monitoring view mode">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeViewTab === 'console'}
+          className={`outpost-view-tab ${activeViewTab === 'console' ? 'is-active' : ''}`}
+          onClick={() => {
+            playClickSound();
+            setActiveViewTab('console');
+          }}
+        >
+          Mission Console
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeViewTab === 'power'}
+          className={`outpost-view-tab ${activeViewTab === 'power' ? 'is-active' : ''}`}
+          onClick={() => {
+            playClickSound();
+            setActiveViewTab('power');
+          }}
+        >
+          Live Power Flow
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeViewTab === 'chart'}
+          className={`outpost-view-tab ${activeViewTab === 'chart' ? 'is-active' : ''}`}
+          onClick={() => {
+            playClickSound();
+            setActiveViewTab('chart');
+          }}
+        >
+          14-Sol History Chart
+        </button>
+      </div>
+
+      {/* Mode 1: Primary Mission Console (Telemetry Tiles + Power Sliders) */}
+      {activeViewTab === 'console' && (
+        <>
+          {/* Real-Time Primary Subsystem Telemetry */}
+          <div className="outpost-telemetry-grid">
         {/* Oxygen Tile */}
         <div className="outpost-tile">
           <div className="outpost-tile__header">
@@ -735,6 +786,66 @@ export function OutpostMissionPanel({ onSolChange }: OutpostMissionPanelProps) {
           </div>
         </div>
       </div>
+      </>
+      )}
+
+      {/* Mode 2: Interactive Dynamic Power Flow */}
+      {activeViewTab === 'power' && (
+        <>
+          <PowerFlowDiagram
+            scenario={scenario}
+            environment={currentEnv}
+            sample={latestSample}
+            allocation={allocation}
+          />
+
+          {/* Quick preset triggers accessible directly from power flow */}
+          <div className="outpost-allocation-card" style={{ marginTop: '0' }}>
+            <div className="outpost-presets">
+              <span className="outpost-presets__label">Quick Strategies:</span>
+              <button
+                type="button"
+                className="outpost-btn-sm"
+                onClick={() => {
+                  playClickSound();
+                  setAllocation(DEFAULT_ALLOCATION);
+                }}
+              >
+                Nominal (46 kW)
+              </button>
+              <button
+                type="button"
+                className="outpost-btn-sm"
+                onClick={() => {
+                  playClickSound();
+                  setAllocation(CONSERVATION_PRESET);
+                }}
+              >
+                Dust Storm Conservation (34 kW)
+              </button>
+              <button
+                type="button"
+                className="outpost-btn-sm"
+                onClick={() => {
+                  playClickSound();
+                  setAllocation(EMERGENCY_PRESET);
+                }}
+              >
+                Emergency Life-Support Only (30 kW)
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Mode 3: 14-Sol Multi-Metric Timeline Chart */}
+      {activeViewTab === 'chart' && (
+        <OutpostHistoryChart
+          samples={samples}
+          scenario={scenario}
+          currentSol={currentSol}
+        />
+      )}
 
       {/* Outcome & Evaluation Card */}
       {evaluation ? (

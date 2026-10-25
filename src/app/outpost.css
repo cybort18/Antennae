@@ -575,6 +575,35 @@
   transition: all 0.15s ease;
 }
 
+.outpost-scenario-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.outpost-scenario-dot--mars {
+  background: #f27b7d;
+  box-shadow: 0 0 6px rgba(242, 123, 125, 0.6);
+}
+
+.outpost-scenario-dot--moon {
+  background: #c8d6e5;
+  box-shadow: 0 0 6px rgba(200, 214, 229, 0.6);
+}
+
+.flow-card__tag {
+  font-family: var(--font-mono, monospace);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  padding: 2px 5px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-muted, #9aacbe);
+}
+
 .outpost-scenario-tab:hover {
   color: #fff;
   background: rgba(255, 255, 255, 0.04);
@@ -952,4 +981,566 @@
   background: linear-gradient(135deg, #d8b266 0%, #f5d48c 100%);
   transform: translateY(-1px);
 }
+
+/* ==========================================================================
+   Phase 6 Innovation: View Mode Tabs
+   ========================================================================== */
+
+.outpost-view-tabs {
+  display: flex;
+  gap: 8px;
+  background: rgba(10, 18, 30, 0.85);
+  padding: 6px;
+  border-radius: 8px;
+  border: 1px solid rgba(77, 166, 255, 0.2);
+  margin-bottom: 12px;
+}
+
+.outpost-view-tab {
+  flex: 1;
+  background: transparent;
+  color: #9cb3cf;
+  border: 1px solid transparent;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease-out;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.outpost-view-tab:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: #ffffff;
+}
+
+.outpost-view-tab.is-active {
+  background: rgba(77, 166, 255, 0.2);
+  border-color: rgba(77, 166, 255, 0.45);
+  color: #d4e8ff;
+  box-shadow: 0 0 10px rgba(77, 166, 255, 0.15);
+}
+
+/* ==========================================================================
+   Phase 6 Innovation: Causal Diagnostics Card
+   ========================================================================== */
+
+.causal-diag-card {
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  border: 1px solid;
+  transition: all 0.2s ease-out;
+}
+
+.causal-diag-card.is-nominal {
+  background: rgba(16, 185, 129, 0.08);
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+.causal-diag-card.is-strained {
+  background: rgba(245, 158, 11, 0.1);
+  border-color: rgba(245, 158, 11, 0.4);
+}
+
+.causal-diag-card.is-critical {
+  background: rgba(239, 68, 68, 0.12);
+  border-color: rgba(239, 68, 68, 0.5);
+  animation: pulseCritical 2s infinite ease-in-out;
+}
+
+@keyframes pulseCritical {
+  0%, 100% { border-color: rgba(239, 68, 68, 0.5); }
+  50% { border-color: rgba(239, 68, 68, 0.9); }
+}
+
+.causal-diag-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.causal-diag-headline-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+}
+
+.causal-diag-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 4px;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.is-nominal .causal-diag-badge {
+  background: rgba(16, 185, 129, 0.2);
+  color: #34d399;
+}
+
+.is-strained .causal-diag-badge {
+  background: rgba(245, 158, 11, 0.25);
+  color: #fbbf24;
+}
+
+.is-critical .causal-diag-badge {
+  background: rgba(239, 68, 68, 0.3);
+  color: #f87171;
+}
+
+.causal-diag-headline {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #e2e8f0;
+}
+
+.causal-diag-toggle-btn {
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #cbd5e1;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease-out;
+}
+
+.causal-diag-toggle-btn:hover {
+  background: rgba(255, 255, 255, 0.14);
+  color: #ffffff;
+}
+
+.causal-diag-body {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.causal-diag-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.diag-item {
+  background: rgba(15, 23, 42, 0.6);
+  border-left: 3px solid;
+  border-radius: 4px;
+  padding: 8px 12px;
+  font-size: 0.8rem;
+}
+
+.diag-item--nominal { border-left-color: #10b981; }
+.diag-item--warning { border-left-color: #f59e0b; }
+.diag-item--danger { border-left-color: #ef4444; }
+
+.diag-item__top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.diag-item__subsystem {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #94a3b8;
+}
+
+.diag-item__title {
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.diag-item__detail {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  line-height: 1.4;
+}
+
+.diag-detail-row {
+  color: #cbd5e1;
+}
+
+.diag-detail-row strong {
+  color: #94a3b8;
+  font-size: 0.76rem;
+  margin-right: 4px;
+}
+
+.diag-detail-row--rec {
+  margin-top: 2px;
+  color: #7dd3fc;
+}
+
+/* ==========================================================================
+   Phase 6 Innovation: Dynamic Power Flow Diagram
+   ========================================================================== */
+
+.power-flow-container {
+  background: rgba(10, 18, 30, 0.7);
+  border: 1px solid rgba(77, 166, 255, 0.25);
+  border-radius: 8px;
+  padding: 14px;
+  margin-bottom: 14px;
+}
+
+.power-flow-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.power-flow-title {
+  margin: 0;
+  font-size: 0.95rem;
+  color: #d4e8ff;
+  font-weight: 700;
+}
+
+.power-flow-status-badge {
+  font-size: 0.74rem;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-family: var(--mono);
+}
+
+.power-flow-status-badge.is-surplus {
+  background: rgba(16, 185, 129, 0.2);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.4);
+}
+
+.power-flow-status-badge.is-deficit {
+  background: rgba(245, 158, 11, 0.2);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.4);
+}
+
+.power-flow-status-badge.is-danger {
+  background: rgba(239, 68, 68, 0.25);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.5);
+  animation: pulseCritical 1.5s infinite;
+}
+
+.power-flow-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 12px;
+}
+
+@media (max-width: 768px) {
+  .power-flow-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.flow-col {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.flow-col-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #64748b;
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+
+.flow-card {
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 8px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.flow-card__icon {
+  font-size: 1.15rem;
+}
+
+.flow-card__info {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.flow-card__name {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #e2e8f0;
+}
+
+.flow-card__type,
+.flow-card__status {
+  font-size: 0.7rem;
+  color: #94a3b8;
+}
+
+.flow-card__val {
+  font-size: 0.88rem;
+  font-weight: 700;
+  font-family: var(--mono);
+  color: #38bdf8;
+}
+
+.flow-sum-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 8px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 4px;
+  font-size: 0.8rem;
+  color: #94a3b8;
+  margin-top: auto;
+}
+
+.flow-sum-row strong {
+  font-family: var(--mono);
+  color: #ffffff;
+}
+
+/* Bus Node */
+.flow-bus-node {
+  background: rgba(30, 41, 59, 0.7);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 6px;
+  padding: 10px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.flow-bus-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #94a3b8;
+}
+
+.flow-bus-balance {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 0.82rem;
+  font-family: var(--mono);
+}
+
+.bus-gen { color: #34d399; font-weight: 700; }
+.bus-arrow { color: #64748b; }
+.bus-dem { color: #f87171; font-weight: 700; }
+
+.flow-card--battery {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  background: rgba(8, 20, 36, 0.8);
+  border-color: rgba(0, 240, 255, 0.3);
+}
+
+.flow-card--battery.is-empty {
+  border-color: rgba(239, 68, 68, 0.6);
+  background: rgba(40, 10, 10, 0.8);
+}
+
+.flow-card__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.flow-battery-bar {
+  height: 8px;
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.flow-battery-fill {
+  height: 100%;
+  transition: width 0.3s ease-out;
+}
+
+.flow-battery-stats {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.74rem;
+  font-family: var(--mono);
+}
+
+/* ==========================================================================
+   Phase 6 Innovation: Timeline SVG Chart
+   ========================================================================== */
+
+.outpost-history-chart {
+  background: rgba(10, 18, 30, 0.8);
+  border: 1px solid rgba(77, 166, 255, 0.25);
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+}
+
+.chart-legend-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.chart-legend-title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #94a3b8;
+  letter-spacing: 0.04em;
+}
+
+.chart-legend-items {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.legend-btn {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #64748b;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  transition: all 0.15s ease-out;
+}
+
+.legend-btn.is-active {
+  background: rgba(255, 255, 255, 0.1);
+  color: #f1f5f9;
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.chart-svg-wrap {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.chart-svg {
+  width: 100%;
+  max-height: 240px;
+  display: block;
+}
+
+.chart-telemetry-summary {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.summary-sol-badge {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #38bdf8;
+  font-family: var(--mono);
+}
+
+.summary-metrics {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  font-size: 0.78rem;
+  color: #cbd5e1;
+}
+
+.summary-metric strong {
+  color: #ffffff;
+  font-family: var(--mono);
+}
+
+.summary-events {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.summary-event-tag {
+  background: rgba(77, 166, 255, 0.15);
+  border: 1px solid rgba(77, 166, 255, 0.3);
+  color: #93c5fd;
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: var(--mono);
+}
+
+/* ---------------------------------------------------- Accessibility: Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+
+  .flow-bus-node::after,
+  .power-flow-status-badge.is-danger,
+  .outpost-dilemma-badge,
+  .causal-diag-badge {
+    animation: none !important;
+  }
+}
+
+/* ---------------------------------------------------- Screen Reader Utility */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 

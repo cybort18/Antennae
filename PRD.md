@@ -2,14 +2,14 @@
 
 **Working Product Name:** Antennae (working title: *Space Sandbox*)  
 **Repository:** [https://github.com/cybort18/Antennae](https://github.com/cybort18/Antennae)  
-**Document Status:** Canonical Product Specification (Phase 4 / V3 Workspace baseline)  
-**Last Verified:** 2026-10-24 (29 test files, 262 tests passing)
+**Document Status:** Canonical Product Specification (Phase 6 / V3 Workspace & Outpost Trainer baseline)  
+**Last Verified:** 2026-10-25 (41 test files, 343 tests passing)
 
 ---
 
 ## 1. Executive Summary & Vision
 
-Antennae is a browser-based educational orbital-physics sandbox and mission-design environment. It enables students, space enthusiasts, and mission designers to explore celestial mechanics through deterministic numerical computation, quantitative baseline-versus-candidate comparisons, and verifiable mission criteria.
+Antennae is a browser-based educational orbital-physics sandbox and mission-design environment. It enables students, space enthusiasts, and mission designers to explore celestial mechanics and planetary surface survival through deterministic numerical computation, quantitative baseline-versus-candidate comparisons, verifiable mission criteria, and physical causal diagnostics.
 
 ### Core Product Thesis
 **Explore → Modify → Simulate → Understand.**  
@@ -25,42 +25,42 @@ Space science education and outreach tools suffer from an artificial divide:
 2. **Specialist mission software** requires deep orbital mechanics expertise, complex coordinate frame setups, and terminal-driven workflows inaccessible to learners.
 3. **Black-box or generative demos** present animations or AI narratives without connecting them to verified numerical equations.
 
-Antennae solves this by pairing an isolated, framework-independent two-body physics core with a minimalist 3D workspace and goal-driven mission evaluation.
+Antennae solves this by pairing an isolated, framework-independent physics core with a minimalist 3D workspace, goal-driven mission evaluation, and a dedicated surface survival mission trainer answering NASA Space Apps *Build a Junior Astronaut Mission Trainer*.
 
 ### 2.2 Target Personas
 
 | Persona | Primary Goal in Antennae | Key Needs |
 |---|---|---|
-| **Curious Learner** | Experiment with orbital speed and altitude; observe motion and shape changes. | Immediate visual feedback, simple controls, clear "Not to scale" cues, intuitive units. |
-| **Student / Educator** | Demonstrate orbital mechanics principles (period, speed, circular velocity) in coursework. | Transparent formulas, repeatable deterministic runs, physical units (km, s, km/s), no fake physics. |
-| **Space Enthusiast** | Inspect real NASA/JPL spacecraft reference states and realistic configurations. | Genuine data provenance (Horizons query, epoch, frame), realistic textures, honest approximations. |
-| **Aspiring Mission Designer** | Solve structured orbit-insertion challenges against explicit constraints. | Explicit target tolerances, clearance constraints, PASS/FAIL criteria based on recorded samples. |
+| **Curious Learner** | Experiment with orbital speed, altitude, and outpost survival; observe motion and shape changes. | Immediate visual feedback, simple controls, clear "Not to scale" cues, intuitive units. |
+| **Student / Educator** | Demonstrate orbital mechanics and habitat resource trade-offs in coursework. | Transparent formulas, repeatable deterministic runs, physical units (km, s, km/s, kW, mSv), no fake physics. |
+| **Space Enthusiast** | Inspect real NASA/JPL spacecraft reference states and planetary environmental hazards. | Genuine data provenance (Horizons query, epoch, frame), realistic textures, honest approximations. |
+| **Aspiring Mission Designer** | Solve structured orbit-insertion challenges and 14-Sol planetary crises against explicit constraints. | Explicit target tolerances, clearance constraints, PASS/FAIL criteria based on recorded samples. |
 | **Hackathon Judge / Reviewer** | Verify scientific integrity, data provenance, code quality, and challenge fit in minutes. | Zero-setup browser app, reproducible runs, clear disclosures, verifiable automated tests. |
 
 ---
 
 ## 3. Product Surfaces & Main User Journeys
 
-The application provides three distinct operational surfaces accessible via top-level mode navigation:
+The application provides four distinct operational surfaces accessible via top-level mode navigation:
 
 ```text
-┌─────────────────────────────────────────────────────────────────────────┐
-│                           Workspace Mode Tabs                           │
-│  [ Solar System (Overview) ]  [ Earth Orbit Lab ]  [ Mission Designer ] │
-└────────────────────────────────────┬────────────────────────────────────┘
-                                     │
-         ┌───────────────────────────┼───────────────────────────┐
-         ▼                           ▼                           ▼
-┌──────────────────┐       ┌──────────────────┐        ┌──────────────────┐
-│  Solar System    │       │ Earth Orbit Lab  │        │ Mission Designer │
-│  (Overview)      │       │ (Open Sandbox)   │        │ (Goal-Driven)    │
-│                  │       │                  │        │                  │
-│ • Static layout  │       │ • Two-body run   │        │ • Target altitude│
-│ • Sun + 8 planets│       │ • Param editing  │        │ • Clearance rule │
-│ • NASA textures  │       │ • Altitude chart │        │ • Coverage rule  │
-│ • Reference view │       │ • Baseline vs    │        │ • Deterministic  │
-│ • No dynamics    │       │   Candidate run  │        │   PASS/FAIL eval │
-└──────────────────┘       └──────────────────┘        └──────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                       Workspace Mode Tabs                                       │
+│ [ Solar System (Overview) ] [ Earth Orbit Lab ] [ Mission Designer ] [ Outpost Mission Trainer ]│
+└───────────────────────────────────────────────┬─────────────────────────────────────────────────┘
+                                                │
+         ┌───────────────────────────┬──────────┴────────────────┬───────────────────────────┐
+         ▼                           ▼                           ▼                           ▼
+┌──────────────────┐       ┌──────────────────┐        ┌──────────────────┐        ┌──────────────────┐
+│  Solar System    │       │ Earth Orbit Lab  │        │ Mission Designer │        │ Outpost Trainer  │
+│  (Overview)      │       │ (Open Sandbox)   │        │ (Goal-Driven)    │        │ (Junior Astro)   │
+│                  │       │                  │        │                  │        │                  │
+│ • 3D Orrery      │       │ • Two-body run   │        │ • Target altitude│        │ • 14-Sol Mars &  │
+│ • Sun + 8 planets│       │ • Param editing  │        │ • Clearance rule │        │   Moon Scenarios │
+│ • NASA textures  │       │ • Altitude chart │        │ • Coverage rule  │        │ • Live Power Flow│
+│ • Illustrative   │       │ • Baseline vs    │        │ • Deterministic  │        │ • 14-Sol SVG     │
+│   Motion         │       │   Candidate run  │        │   PASS/FAIL eval │        │ • Causal Diag.   │
+└──────────────────┘       └──────────────────┘        └──────────────────┘        └──────────────────┘
 ```
 
 ### 3.1 Solar System Overview (Orientation & Reference Surface)

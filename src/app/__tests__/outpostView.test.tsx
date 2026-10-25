@@ -133,5 +133,68 @@ describe('OutpostMissionPanel', () => {
     fireEvent.click(muteBtn);
     expect(screen.getByRole('button', { name: /Unmute sound effects/i })).toBeTruthy();
   });
+
+  it('switches to Live Power Flow tab and displays energy balance diagram', () => {
+    render(<OutpostMissionPanel />);
+
+    const powerTab = screen.getByRole('tab', { name: /Live Power Flow/i });
+    fireEvent.click(powerTab);
+
+    expect(screen.getByRole('region', { name: /Dynamic Power Grid Flow Diagram/i })).toBeTruthy();
+    expect(screen.getByText('CENTRAL DISTRIBUTION BUS')).toBeTruthy();
+    expect(screen.getByText(/Kilopower Nuclear/i)).toBeTruthy();
+  });
+
+  it('switches to 14-Sol History Chart tab and displays multi-metric timeline chart', () => {
+    render(<OutpostMissionPanel />);
+
+    const chartTab = screen.getByRole('tab', { name: /14-Sol History Chart/i });
+    fireEvent.click(chartTab);
+
+    expect(screen.getByRole('region', { name: /14-Sol Multi-Metric Timeline Chart/i })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Battery \(%\)/i })).toBeTruthy();
+  });
+
+  it('expands Causal Diagnostics card to reveal flight director scientific analysis', () => {
+    render(<OutpostMissionPanel />);
+
+    expect(screen.getByRole('region', { name: /Flight Director Causal Diagnostics/i })).toBeTruthy();
+
+    const whyBtn = screen.getByRole('button', { name: /Why is this happening\?/i });
+    fireEvent.click(whyBtn);
+
+    expect(screen.getAllByText(/Cause:/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Flight Director Advice:/i).length).toBeGreaterThan(0);
+  });
+
+  it('provides screen reader live power balance summary in Live Power Flow tab', () => {
+    render(<OutpostMissionPanel />);
+
+    const powerTab = screen.getByRole('tab', { name: /Live Power Flow/i });
+    fireEvent.click(powerTab);
+
+    expect(screen.getByText(/Total generation is \d+(\.\d+)? kilowatts/i)).toBeTruthy();
+    expect(screen.getByText(/Total demand is \d+(\.\d+)? kilowatts/i)).toBeTruthy();
+  });
+
+  it('supports keyboard navigation (Arrow keys) on 14-Sol History Chart', () => {
+    render(<OutpostMissionPanel />);
+
+    // Advance 1 sol so samples has at least 2 entries
+    const advanceBtn = screen.getByRole('button', { name: /Advance 1 Sol/i });
+    fireEvent.click(advanceBtn);
+
+    const chartTab = screen.getByRole('tab', { name: /14-Sol History Chart/i });
+    fireEvent.click(chartTab);
+
+    const chartRegion = screen.getByRole('region', { name: /14-Sol Multi-Metric Timeline Chart/i });
+    expect(chartRegion).toBeTruthy();
+
+    // Trigger ArrowLeft and ArrowRight keyboard events
+    fireEvent.keyDown(chartRegion, { key: 'ArrowLeft' });
+    fireEvent.keyDown(chartRegion, { key: 'ArrowRight' });
+    fireEvent.keyDown(chartRegion, { key: 'Home' });
+    fireEvent.keyDown(chartRegion, { key: 'End' });
+  });
 });
 
